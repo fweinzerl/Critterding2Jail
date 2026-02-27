@@ -56,6 +56,8 @@
 			BEntity* m_right;
 			BEntity* m_up;
 			BEntity* m_down;
+			BEntity* m_forward_horizontal_only;
+			BEntity* m_allow_roll_for_movement;
 
 			BEntity* m_look_left;
 			BEntity* m_look_right;
@@ -63,6 +65,10 @@
 			BEntity* m_look_down;
 			BEntity* m_look_roll_left;
 			BEntity* m_look_roll_right;
+
+			bool m_yaw_pitch_initialized;
+			float m_yaw;
+			float m_pitch;
 	
 			BEntity* m_window_width;
 			BEntity* m_window_height;

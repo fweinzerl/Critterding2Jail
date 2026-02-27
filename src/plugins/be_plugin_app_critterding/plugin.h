@@ -51,4 +51,8 @@
 				BEntity* m_win_height;
 				BEntity* m_mouse_x;
 				BEntity* m_mouse_y;
+				BEntity* m_camera_sensitivity_move;
+				BEntity* m_camera_turbo_active;
+				float m_camera_move_base_sensitivity;
+				float m_camera_turbo_multiplier;
 		};

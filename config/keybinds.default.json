@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "profile": "default",
+  "meta": {
+    "scope": "global",
+    "applies_to": [
+      "app_critterding",
+      "app_critterding_threads"
+    ]
+  },
+  "movement": {
+    "forward_mode": "horizontal_only",
+    "allow_roll_for_movement": false,
+    "turbo_multiplier": 3.0
+  },
+  "actions": {
+    "ui.open_admin_window": {
+      "type": "trigger",
+      "default_keys": [
+        "f1"
+      ]
+    },
+    "ui.open_control_panel": {
+      "type": "trigger",
+      "default_keys": [
+        "f2"
+      ]
+    },
+    "ui.open_system_monitor": {
+      "type": "trigger",
+      "default_keys": [
+        "f3"
+      ]
+    },
+    "ui.open_life_stats_panel": {
+      "type": "trigger",
+      "default_keys": [
+        "f4"
+      ]
+    },
+    "render.toggle": {
+      "type": "toggle",
+      "default_keys": [
+        "f10"
+      ]
+    },
+    "window.toggle_fullscreen": {
+      "type": "trigger",
+      "default_keys": [
+        "f11"
+      ]
+    },
+    "window.toggle_vsync": {
+      "type": "toggle",
+      "default_keys": [
+        "f12"
+      ]
+    },
+    "camera.move_forward": {
+      "type": "hold",
+      "default_keys": [
+        "up"
+      ]
+    },
+    "camera.move_backward": {
+      "type": "hold",
+      "default_keys": [
+        "down"
+      ]
+    },
+    "camera.move_left": {
+      "type": "hold",
+      "default_keys": [
+        "left"
+      ]
+    },
+    "camera.move_right": {
+      "type": "hold",
+      "default_keys": [
+        "right"
+      ]
+    },
+    "camera.move_up": {
+      "type": "hold",
+      "default_keys": [
+        "home"
+      ]
+    },
+    "camera.move_down": {
+      "type": "hold",
+      "default_keys": [
+        "end"
+      ]
+    },
+    "camera.look_left": {
+      "type": "hold",
+      "default_keys": [
+        "[4]"
+      ]
+    },
+    "camera.look_right": {
+      "type": "hold",
+      "default_keys": [
+        "[6]"
+      ]
+    },
+    "camera.look_up": {
+      "type": "hold",
+      "default_keys": [
+        "[2]"
+      ]
+    },
+    "camera.look_down": {
+      "type": "hold",
+      "default_keys": [
+        "[8]"
+      ]
+    },
+    "camera.roll_left": {
+      "type": "hold",
+      "default_keys": [
+        "[1]"
+      ]
+    },
+    "camera.roll_right": {
+      "type": "hold",
+      "default_keys": [
+        "[3]"
+      ]
+    },
+    "camera.turbo": {
+      "type": "hold",
+      "default_keys": [
+        "shift"
+      ]
+    }
+  }
+}

@@ -1,6 +1,7 @@
 #include "be_entity_camera.h"
 #include "be_entity_graphics_model.h"
 #include <GL/gl.h>
+#include <cmath>
 #include <glm/gtc/type_ptr.hpp>
 
 // #include <iostream>
@@ -8,6 +9,9 @@
 	BCamera::BCamera()
 	: BEntity()
 	, m_s_elapsed(0)
+	, m_yaw_pitch_initialized(false)
+	, m_yaw(0.0f)
+	, m_pitch(0.0f)
 	{
 		setProcessing();
 	}
@@ -43,6 +47,11 @@
 		m_right = movement->addChild( "right", new BEntity_bool() );
 		m_up = movement->addChild( "up", new BEntity_bool() );
 		m_down = movement->addChild( "down", new BEntity_bool() );
+		auto movement_settings = movement->addChild( "settings", new BEntity() );
+		m_forward_horizontal_only = movement_settings->addChild( "forward_horizontal_only", new BEntity_bool() );
+		m_forward_horizontal_only->set( false );
+		m_allow_roll_for_movement = movement_settings->addChild( "allow_roll_for_movement", new BEntity_bool() );
+		m_allow_roll_for_movement->set( true );
 
 		auto looking = addChild( "looking", new BEntity() );
 		m_look_left = looking->addChild( "left", new BEntity_bool() );
@@ -90,56 +99,141 @@
 				m_s_elapsed = topParent()->getChild("sys", 1)->getChild("timer", 1)->getChild("s_elapsed", 1);
 
 			// process movement
-			if ( m_forward->get_bool() )
+			const auto move_step = m_sensitivity_move->get_float() * m_s_elapsed->get_float();
+			const bool forward_horizontal_only = m_forward_horizontal_only->get_bool();
+			const bool allow_roll_for_movement = m_allow_roll_for_movement->get_bool();
+
+			if ( forward_horizontal_only || !allow_roll_for_movement )
 			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( 0.0f, 0.0f, -m_sensitivity_move->get_float() * m_s_elapsed->get_float() ));
+				btVector3 forward(
+					-m_transform->m_transform.getBasis()[0][2],
+					-m_transform->m_transform.getBasis()[1][2],
+					-m_transform->m_transform.getBasis()[2][2]
+				);
+				forward.setY( 0.0f );
+				if ( forward.length2() > 0.000001f )
+				{
+					forward.normalize();
+				}
+				else
+				{
+					forward = btVector3( 0.0f, 0.0f, -1.0f );
+				}
+
+				auto right = forward.cross( btVector3( 0.0f, 1.0f, 0.0f ) );
+				if ( right.length2() > 0.000001f )
+				{
+					right.normalize();
+				}
+				else
+				{
+					right = btVector3( 1.0f, 0.0f, 0.0f );
+				}
+
+				btVector3 delta( 0.0f, 0.0f, 0.0f );
+				if ( m_forward->get_bool() ) delta += forward * move_step;
+				if ( m_backward->get_bool() ) delta -= forward * move_step;
+				if ( m_left->get_bool() ) delta -= right * move_step;
+				if ( m_right->get_bool() ) delta += right * move_step;
+				if ( m_up->get_bool() ) delta += btVector3( 0.0f, move_step, 0.0f );
+				if ( m_down->get_bool() ) delta -= btVector3( 0.0f, move_step, 0.0f );
+
+				if ( delta.length2() > 0.0f )
+				{
+					auto origin = m_transform->m_transform.getOrigin();
+					origin += delta;
+					m_transform->m_transform.setOrigin( origin );
+				}
 			}
-			if ( m_backward->get_bool() )
+			else
 			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( 0.0f, 0.0f, m_sensitivity_move->get_float() * m_s_elapsed->get_float() ));
-			}
-			if ( m_left->get_bool() )
-			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( -m_sensitivity_move->get_float() * m_s_elapsed->get_float(), 0.0f, 0.f ));
-			}
-			if ( m_right->get_bool() )
-			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( m_sensitivity_move->get_float() * m_s_elapsed->get_float(), 0.0f, 0.f ));
-			}
-			if ( m_up->get_bool() )
-			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( 0.0f, m_sensitivity_move->get_float() * m_s_elapsed->get_float(), 0.f ));
-			}
-			if ( m_down->get_bool() )
-			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( 0.0f, -m_sensitivity_move->get_float() * m_s_elapsed->get_float(), 0.f ));
+				if ( m_forward->get_bool() )
+				{
+					m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( 0.0f, 0.0f, -move_step ));
+				}
+				if ( m_backward->get_bool() )
+				{
+					m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( 0.0f, 0.0f, move_step ));
+				}
+				if ( m_left->get_bool() )
+				{
+					m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( -move_step, 0.0f, 0.f ));
+				}
+				if ( m_right->get_bool() )
+				{
+					m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( move_step, 0.0f, 0.f ));
+				}
+				if ( m_up->get_bool() )
+				{
+					m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( 0.0f, move_step, 0.f ));
+				}
+				if ( m_down->get_bool() )
+				{
+					m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, 0.0f ), btVector3( 0.0f, -move_step, 0.f ));
+				}
 			}
 			
-			// process looking
-			if ( m_look_left->get_bool() )
+			// process looking using yaw/pitch only (no roll tilt drift)
+			if ( !m_yaw_pitch_initialized )
 			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( m_sensitivity_look->get_float() * m_s_elapsed->get_float(), 0.0f, 0.0f ));
+				btVector3 initial_forward(
+					-m_transform->m_transform.getBasis()[0][2],
+					-m_transform->m_transform.getBasis()[1][2],
+					-m_transform->m_transform.getBasis()[2][2]
+				);
+				if ( initial_forward.length2() > 0.000001f )
+				{
+					initial_forward.normalize();
+					m_yaw = std::atan2( initial_forward.x(), -initial_forward.z() );
+					m_pitch = std::asin( std::max( -1.0f, std::min( 1.0f, initial_forward.y() ) ) );
+				}
+				m_yaw_pitch_initialized = true;
 			}
-			if ( m_look_right->get_bool() )
+
+			const auto look_step = m_sensitivity_look->get_float() * m_s_elapsed->get_float();
+			if ( m_look_left->get_bool() ) m_yaw -= look_step;
+			if ( m_look_right->get_bool() ) m_yaw += look_step;
+			if ( m_look_up->get_bool() ) m_pitch += look_step;
+			if ( m_look_down->get_bool() ) m_pitch -= look_step;
+
+			const float max_pitch = 1.553343f; // ~89 degrees
+			if ( m_pitch > max_pitch ) m_pitch = max_pitch;
+			if ( m_pitch < -max_pitch ) m_pitch = -max_pitch;
+
+			const auto cp = std::cos( m_pitch );
+			const auto sp = std::sin( m_pitch );
+			const auto sy = std::sin( m_yaw );
+			const auto cy = std::cos( m_yaw );
+
+			btVector3 forward( sy * cp, sp, -cy * cp );
+			if ( forward.length2() > 0.000001f )
 			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( -m_sensitivity_look->get_float() * m_s_elapsed->get_float(), 0.0f, 0.0f ));
+				forward.normalize();
 			}
-			if ( m_look_up->get_bool() )
+			else
 			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, m_sensitivity_look->get_float() * m_s_elapsed->get_float(), 0.0f ));
+				forward = btVector3( 0.0f, 0.0f, -1.0f );
 			}
-			if ( m_look_down->get_bool() )
+
+			btVector3 world_up( 0.0f, 1.0f, 0.0f );
+			btVector3 right = forward.cross( world_up );
+			if ( right.length2() > 0.000001f )
 			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, -m_sensitivity_look->get_float() * m_s_elapsed->get_float(), 0.0f ));
+				right.normalize();
 			}
-			if ( m_look_roll_left->get_bool() )
+			else
 			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, m_sensitivity_look->get_float() * m_s_elapsed->get_float() ));
+				right = btVector3( 1.0f, 0.0f, 0.0f );
 			}
-			if ( m_look_roll_right->get_bool() )
-			{
-				m_transform->m_transform = m_transform->m_transform * btTransform(btQuaternion( 0.0f, 0.0f, -m_sensitivity_look->get_float() * m_s_elapsed->get_float() ));
-			}
+			btVector3 up = right.cross( forward );
+			up.normalize();
+
+			btMatrix3x3 basis(
+				right.x(), up.x(), -forward.x(),
+				right.y(), up.y(), -forward.y(),
+				right.z(), up.z(), -forward.z()
+			);
+			m_transform->m_transform.setBasis( basis );
 
 			// PROJECTION MATRIX
 				// perspective( m_fov_y->get_float(), m_aspect_ratio->get_float(), m_z_near->get_float(), m_z_far->get_float() );
@@ -206,4 +300,3 @@
 
 		return rayTo;
 	}
-

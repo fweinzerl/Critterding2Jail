@@ -4,6 +4,7 @@
 #include "plugins/be_plugin_app_critterding/food_system.h"
 #include "plugins/be_plugin_app_critterding/critter_system.h"
 #include "plugins/be_plugin_app_critterding/commands.h"
+#include "plugins/be_plugin_app_critterding/keybind_config.h"
 #include "critter_thread_mesher.h"
 // #include "plugins/be_plugin_bullet/be_entity_physics_entity.h"
 // #include "plugins/be_plugin_bullet/be_entity_transform.h" // FIXME work this away
@@ -238,6 +239,17 @@
 			transform->getChild( "rotation_euler_y" )->set( 0.0f );
 			transform->getChild( "rotation_euler_z" )->set( 0.0f );
 
+		// KEYBIND CONFIG + MOVEMENT SETTINGS
+			const auto keybind_config = load_cd_keybind_config();
+			m_camera_turbo_multiplier = keybind_config.turbo_multiplier;
+			m_camera_sensitivity_move = m_camera->getChild("sensitivity_move", 1);
+			m_camera_move_base_sensitivity = m_camera_sensitivity_move->get_float();
+			m_camera_turbo_active = m_camera->addChild("turbo_active", new BEntity_bool());
+			m_camera_turbo_active->set(false);
+			auto movement_settings = m_camera->getChild("movement", 1)->getChild("settings", 1);
+			movement_settings->getChild("forward_horizontal_only", 1)->set(keybind_config.forward_horizontal_only);
+			movement_settings->getChild("allow_roll_for_movement", 1)->set(keybind_config.allow_roll_for_movement);
+
 		// COMMANDS
 			auto commands = glwindow->addChild( "commands", new BEntity() );
 			auto toggleFullscreen = commands->addChild( "toggleFullscreen", new cmd_toggleFullscreen() );
@@ -251,47 +263,52 @@
 
 		// BINDINGS
 			auto bindings = glwindow->getChild( "bindings", 1 );
+			auto bind_trigger = [bindings](const std::string& key, BEntity* target)
+			{
+				auto binding = bindings->addChild(key.c_str(), new BEntity_trigger());
+				binding->connectServerServer(target);
+			};
+			auto bind_hold = [bindings](const std::string& key, BEntity* target)
+			{
+				auto binding = bindings->addChild(key.c_str(), new BEntity_bool());
+				binding->connectServerServer(target);
+			};
+			auto bind_keydown_toggle = [bindings](const std::string& key, BEntity* target, bool initial)
+			{
+				std::string node_name("key_down_");
+				node_name += key;
+				auto binding = bindings->addChild(node_name.c_str(), new BEntity_bool());
+				binding->set(initial);
+				binding->connectServerServer(target);
+			};
 
-			// render
-				auto re = t_graphicsModelSystem->getChild("active", 1);
-				if ( re )
-				{
-					auto re_bool = bindings->addChild( "key_down_f10", new BEntity_bool() );
-					re_bool->set( true );
-					re_bool->connectServerServer( re );
-				}
-			// fullscreen
-				bindings->addChild( "key_down_f11", new BEntity_trigger() )->connectServerServer( toggleFullscreen );
-				// auto fs = glwindow->getChild("fullscreen", 1);
-				// if ( fs )
-					// bindings->addChild( "key_down_f11", new BEntity_bool() )->connectServerServer( fs );
-			// vsync
-				auto vs = glwindow->getChild("vsync", 1);
-				if ( vs )
-					bindings->addChild( "key_down_f12", new BEntity_bool() )->connectServerServer( vs );
-		
-			auto binding_f1 = bindings->addChild( "f1", new BEntity_trigger() );
-			binding_f1->connectServerServer( launchAdminWindow );
+			for (const auto& key : get_cd_action_keys(keybind_config, "ui.open_admin_window", {"f1"}))
+				bind_trigger(key, launchAdminWindow);
+			for (const auto& key : get_cd_action_keys(keybind_config, "ui.open_control_panel", {"f2"}))
+				bind_trigger(key, launchControlPanel);
+			for (const auto& key : get_cd_action_keys(keybind_config, "ui.open_system_monitor", {"f3"}))
+				bind_trigger(key, launchSystemMonitor);
+			for (const auto& key : get_cd_action_keys(keybind_config, "ui.open_life_stats_panel", {"f4"}))
+				bind_trigger(key, launchLifeStatsPanel);
 
-			auto binding_f2 = bindings->addChild( "f2", new BEntity_trigger() );
-			binding_f2->connectServerServer( launchControlPanel );
+			auto render_active = t_graphicsModelSystem->getChild("active", 1);
+			if (render_active)
+			{
+				for (const auto& key : get_cd_action_keys(keybind_config, "render.toggle", {"f10"}))
+					bind_keydown_toggle(key, render_active, true);
+			}
+			for (const auto& key : get_cd_action_keys(keybind_config, "window.toggle_fullscreen", {"f11"}))
+				bind_trigger(std::string("key_down_") + key, toggleFullscreen);
+			auto vsync = glwindow->getChild("vsync", 1);
+			if (vsync)
+			{
+				for (const auto& key : get_cd_action_keys(keybind_config, "window.toggle_vsync", {"f12"}))
+					bind_keydown_toggle(key, vsync, false);
+			}
 
-			auto binding_f3 = bindings->addChild( "f3", new BEntity_trigger() );
-			binding_f3->connectServerServer( launchSystemMonitor );
-
-			auto binding_f4 = bindings->addChild( "f4", new BEntity_trigger() );
-			binding_f4->connectServerServer( launchLifeStatsPanel );
-
-			// bindings to mouse
 			auto binding_mouse_2 = bindings->addChild( "mousebutton_down_2", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
 			binding_mouse_2->connectServerServer( launchSelectionWindow );
    
-			// auto binding_mouse_3_down = bindings->addChild( "mousebutton_down_3", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
-			// binding_mouse_3_down->connectServerServer( mousePickBody );
-			// auto binding_mouse_3_up = bindings->addChild( "mousebutton_up_3", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
-			// binding_mouse_3_up->connectServerServer( mouseUnpickBody );
-			
-			// bindings to movements
 			auto movement = m_camera->getChild("movement", 1);
 			auto forward = movement->getChild( "forward", 1 );
 			auto backward = movement->getChild( "backward", 1 );
@@ -299,20 +316,19 @@
 			auto right = movement->getChild( "right", 1 );
 			auto up = movement->getChild( "up", 1 );
 			auto down = movement->getChild( "down", 1 );
-			auto binding_up = bindings->addChild( "up", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			auto binding_down = bindings->addChild( "down", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			auto binding_left = bindings->addChild( "left", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			auto binding_right = bindings->addChild( "right", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			auto binding_home = bindings->addChild( "home", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			auto binding_end = bindings->addChild( "end", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			binding_up->connectServerServer( forward );
-			binding_down->connectServerServer( backward );
-			binding_left->connectServerServer( left );
-			binding_right->connectServerServer( right );
-			binding_home->connectServerServer( up );
-			binding_end->connectServerServer( down );
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.move_forward", {"up"}))
+				bind_hold(key, forward);
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.move_backward", {"down"}))
+				bind_hold(key, backward);
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.move_left", {"left"}))
+				bind_hold(key, left);
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.move_right", {"right"}))
+				bind_hold(key, right);
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.move_up", {"home"}))
+				bind_hold(key, up);
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.move_down", {"end"}))
+				bind_hold(key, down);
 			
-			// bindings to looking
 			auto looking = m_camera->getChild("looking", 1);
 			auto look_left = looking->getChild( "left", 1 );
 			auto look_right = looking->getChild( "right", 1 );
@@ -320,18 +336,20 @@
 			auto look_down = looking->getChild( "down", 1 );
 			auto look_roll_left = looking->getChild( "roll_left", 1 );
 			auto look_roll_right = looking->getChild( "roll_right", 1 );
-			auto binding_4 = bindings->addChild( "[4]", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			auto binding_6 = bindings->addChild( "[6]", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			auto binding_2 = bindings->addChild( "[2]", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			auto binding_8 = bindings->addChild( "[8]", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			auto binding_1 = bindings->addChild( "[1]", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			auto binding_3 = bindings->addChild( "[3]", new BEntity_bool() );  // FIXME CONNECT TO bool under std_window
-			binding_4->connectServerServer( look_left );
-			binding_6->connectServerServer( look_right );
-			binding_2->connectServerServer( look_up );
-			binding_8->connectServerServer( look_down );
-			binding_1->connectServerServer( look_roll_left );
-			binding_3->connectServerServer( look_roll_right );
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.look_left", {"[4]"}))
+				bind_hold(key, look_left);
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.look_right", {"[6]"}))
+				bind_hold(key, look_right);
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.look_up", {"[2]"}))
+				bind_hold(key, look_up);
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.look_down", {"[8]"}))
+				bind_hold(key, look_down);
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.roll_left", {"[1]"}))
+				bind_hold(key, look_roll_left);
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.roll_right", {"[3]"}))
+				bind_hold(key, look_roll_right);
+			for (const auto& key : get_cd_action_keys(keybind_config, "camera.turbo", {"shift"}))
+				bind_hold(key, m_camera_turbo_active);
 
 // 		// LIGHT
 // 		{
@@ -755,6 +773,12 @@
 
 	void Scene::process()
 	{
+		if (m_camera_sensitivity_move && m_camera_turbo_active)
+		{
+			const auto turbo_factor = m_camera_turbo_active->get_bool() ? m_camera_turbo_multiplier : 1.0f;
+			m_camera_sensitivity_move->set(m_camera_move_base_sensitivity * turbo_factor);
+		}
+
 // 		// std::cout << "a" << std::endl;
 // 		// CAST RAY FROM MOUSE
 // 			auto camera_position = m_camera->m_transform->m_transform.getOrigin();
