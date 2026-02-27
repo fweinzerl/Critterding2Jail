@@ -154,6 +154,41 @@
 		return false;
 	}
 
+	bool cmd_launchLifeStatsPanel::set()
+	{
+		auto bin = topParent()->getChild( "bin", 1 );
+		auto lib = topParent()->getChild( "lib", 1 );
+
+		// set GUI tranlation if fullscreen
+		auto fs = bin->getChild( "GLWindow", 2 )->getChild( "fullscreen", 1 );
+		if ( fs->get_bool() && !lib->getChild("Translate_QT_IMGUI", 1) )
+		{
+			lib->addChild("Translate_QT_IMGUI", "Translate_QT_IMGUI");
+		}
+
+		BEntity* p;
+		if ( lib->getChild("Translate_QT_IMGUI", 1) )
+		{
+			p = bin->getChild( "GLWindow", 2 );
+		}
+		else
+		{
+			p = bin->getChild( "QT Application", 2 );
+		}
+		if ( !p->getChild( "CdLifeStatsPanel", 1 ) )
+		{
+			p->addChild( "CdLifeStatsPanel", "CdLifeStatsPanel" );
+		}
+
+		// unset GUI tranlation
+		if ( lib->getChild("Translate_QT_IMGUI", 1) )
+		{
+			lib->removeChild( lib->getChild("Translate_QT_IMGUI", 1) );
+		}
+
+		return false;
+	}
+
 	bool cmd_launchSystemMonitor::set()
 	{
 		auto bin = topParent()->getChild( "bin", 1 );
@@ -451,4 +486,3 @@
 		}
 		return false;
 	}
-

@@ -41,8 +41,14 @@
 		// m_dropzone_size_y->set( Bfloat(2.2f) );
 		// m_dropzone_size_z->set( Bfloat(190.0f) );
 		
-		m_insert_frame_interval = settings->addChild( "insert_frame_interval", new BEntity_uint() ); // FIXME why?
-		m_insert_frame_interval->set( (Buint)2 );
+			m_insert_frame_interval = settings->addChild( "insert_frame_interval", new BEntity_uint() ); // FIXME why?
+			m_insert_frame_interval->set( (Buint)2 );
+
+			auto stats = settings->addChild( "stats", new BEntity() );
+			m_stats_births_total = stats->addChild( "births_total", new BEntity_uint() );
+			m_stats_deaths_total = stats->addChild( "deaths_total", new BEntity_uint() );
+			m_stats_births_total->set( Buint(0) );
+			m_stats_deaths_total->set( Buint(0) );
 
 		m_mouse_picker = 0;
 		auto ext = parent()->getChild("external_mousepicker", 1);
@@ -133,11 +139,12 @@
 	bool CdFoodSystem::set( const Bstring& id, BEntity* value )
 	// bool CdFoodSystem::set( const char* value )
 	{
-		if ( id == std::string("insert_food") )
-		{
-			auto food_unit = new CdFood();
-			m_unit_container->addChild( "food_unit", food_unit );
-			food_unit->setEnergy( m_intitial_energy->get_float() );
+			if ( id == std::string("insert_food") )
+			{
+				auto food_unit = new CdFood();
+				m_unit_container->addChild( "food_unit", food_unit );
+				food_unit->setEnergy( m_intitial_energy->get_float() );
+				m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
 
 			// FIXME looking up by _external_child name isn't ok, we are lucky it's first of the children
 			auto physics = food_unit->getChild("external_physics", 1)->get_reference();
@@ -172,10 +179,12 @@
 		return false;
 	}
 	
-	void CdFoodSystem::removeFood( BEntity* entity, bool force_direct_deletion )
-	{
-		// HACK first external child one is body
-		auto bodypart = entity->getChild( "external_physics", 1 )->get_reference();
+		void CdFoodSystem::removeFood( BEntity* entity, bool force_direct_deletion )
+		{
+			m_stats_deaths_total->set( m_stats_deaths_total->get_uint() + 1 );
+
+			// HACK first external child one is body
+			auto bodypart = entity->getChild( "external_physics", 1 )->get_reference();
 		
 		// COLLISIONS
 			while ( removeFromCollisions( bodypart ) ) {;}

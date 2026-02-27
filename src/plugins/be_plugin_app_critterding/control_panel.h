@@ -21,26 +21,23 @@
 			
 			// SHORTCUTS
 			BEntity* m_critter_unit_container;
-			BEntity* m_critter_maximum_age;
-			BEntity* m_critter_species_system_unit_container;
-			BEntity* m_food_unit_container;
 			BEntity* m_brain_unit_container;
 
 			// LINE EDITS
-			BEntity* m_line_edit_avg_adam_distance;
-			BEntity* m_line_edit_generations;
-			BEntity* m_line_edit_critters;
-			BEntity* m_line_edit_food;
 			BEntity* m_line_edit_total_neurons;
 			BEntity* m_line_edit_total_synapses;
 			BEntity* m_line_edit_avg_neurons;
 			BEntity* m_line_edit_avg_synapses;
+			BEntity* m_line_edit_sim_speed_fps;
+			BEntity* m_line_edit_sim_steps_per_sec;
 			BEntity* m_line_edit_species;
 			BEntity* m_line_edit_avg_crittersperspecies;
-			BEntity* m_qwt_curve_critters;
-			BEntity* m_qwt_curve_food;
 
 			BEntity* m_timer_frame;
+			BEntity* m_timer_ms_total;
+			BEntity* m_sleeper_target_fps;
+			Buint m_last_frame;
+			Buint m_last_ms_total;
 	};
 
 #endif

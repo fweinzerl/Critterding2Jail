@@ -270,7 +270,7 @@
 					// CREATE A RASTER WINDOW
 					auto rasterWindow = system_objects->addChild( "RasterWindow", new RasterWindow() );
 					// auto rasterWindow = t_qtapp->addChild( "RasterWindow", new RasterWindow() );
-					rasterWindow->set("title", "CPU logical cores"); // FIXME
+					rasterWindow->getChild("QT RasterWindow", 1)->set("title", "CPU Usage");
 					rasterWindow->getChild("QT RasterWindow", 1)->set("on_close_destroy_entity", system_objects);
 
 						
@@ -943,4 +943,3 @@
 		// UPDATE UPTIME
 // 			m_line_edit_fps_avg->set(m_timer.getTotalSeconds());
 	}
-

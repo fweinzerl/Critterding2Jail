@@ -39,6 +39,8 @@
 				BEntity* m_dropzone_size_x;
 				BEntity* m_dropzone_size_y;
 				BEntity* m_dropzone_size_z;
+				BEntity* m_stats_births_total;
+				BEntity* m_stats_deaths_total;
 				
 				BEntity* m_rng;
 // 				BeRand m_randomizer;

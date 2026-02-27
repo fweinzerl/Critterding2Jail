@@ -18,16 +18,24 @@
 			bool set();
 	};
 
-	class cmd_launchControlPanel: public BEntity_trigger
-	{
-		public:
-			cmd_launchControlPanel() { };
-			virtual ~cmd_launchControlPanel() {};
-			bool set();
-	};
+class cmd_launchControlPanel: public BEntity_trigger
+{
+	public:
+		cmd_launchControlPanel() { };
+		virtual ~cmd_launchControlPanel() {};
+		bool set();
+};
 
-	class cmd_launchSystemMonitor: public BEntity_trigger
-	{
+class cmd_launchLifeStatsPanel: public BEntity_trigger
+{
+	public:
+		cmd_launchLifeStatsPanel() { };
+		virtual ~cmd_launchLifeStatsPanel() {};
+		bool set();
+};
+
+class cmd_launchSystemMonitor: public BEntity_trigger
+{
 		public:
 			cmd_launchSystemMonitor() { };
 			virtual ~cmd_launchSystemMonitor() {};

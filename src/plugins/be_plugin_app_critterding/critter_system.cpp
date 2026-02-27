@@ -68,11 +68,17 @@
 		// m_dropzone_size_y->set( Bfloat(1.0f) );
 		// m_dropzone_size_z->set( Bfloat(180.0f) );
 		
-		m_insert_frame_interval = settings->addChild( "insert_frame_interval", new BEntity_uint() );
-		m_insert_frame_interval->set( (Buint)20 );
+			m_insert_frame_interval = settings->addChild( "insert_frame_interval", new BEntity_uint() );
+			m_insert_frame_interval->set( (Buint)20 );
 
-		m_copy_random_position = settings->addChild( "copy_random_position", new BEntity_bool() );
-		m_copy_random_position->set( false );
+			m_copy_random_position = settings->addChild( "copy_random_position", new BEntity_bool() );
+			m_copy_random_position->set( false );
+
+			auto stats = settings->addChild( "stats", new BEntity() );
+			m_stats_births_total = stats->addChild( "births_total", new BEntity_uint() );
+			m_stats_deaths_total = stats->addChild( "deaths_total", new BEntity_uint() );
+			m_stats_births_total->set( Buint(0) );
+			m_stats_deaths_total->set( Buint(0) );
 		
 		m_mouse_picker = 0;
 		auto ext = parent()->getChild("external_mousepicker", 1);
@@ -189,11 +195,12 @@
 	// bool CdCritterSystem::set( const char* value )
 	bool CdCritterSystem::set( const Bstring& id, BEntity* value )
 	{
-		if ( id == std::string("insert_critter") )
-		{
-					auto critter_unit = new CdCritter();
-					m_unit_container->addChild( "critter_unit", critter_unit );
-					critter_unit->setEnergy( m_intitial_energy->get_float() );
+			if ( id == std::string("insert_critter") )
+			{
+						auto critter_unit = new CdCritter();
+						m_unit_container->addChild( "critter_unit", critter_unit );
+						critter_unit->setEnergy( m_intitial_energy->get_float() );
+						m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
 
 					// BODY
 						// auto newBody = body_unit_system->addChild( "body", new BBody() );
@@ -281,8 +288,8 @@
 			return true;
 		}
 
-		if ( id == std::string("procreate_critter") )
-		{
+			if ( id == std::string("procreate_critter") )
+			{
 			auto critter_unit = dynamic_cast<CdCritter*>( value->getChild("entity", 1)->get_reference() );
 			// std::cout << "ad: " << critter_unit->getChild( "adam_distance", 1 )->get_uint() << " total:" << m_unit_container->numChildren()+1 << "(h: " << t_highest << ")" << ": " << critter_unit->id() << std::endl;
 			std::cout << "ad: " << critter_unit->getChild( "adam_distance", 1 )->get_uint() << " total:" << m_unit_container->numChildren()+1 << ": " << critter_unit->id() << std::endl;
@@ -335,13 +342,14 @@
 				}
 				
 				// ACTUAL MUTATE
-				if ( m_brain_system->set( "mutate", brain_new ) )
-				{
-					auto ad = critter_new->getChild( "adam_distance", 1 );
-					ad->set( ad->get_uint() + 1 );
+					if ( m_brain_system->set( "mutate", brain_new ) )
+					{
+						auto ad = critter_new->getChild( "adam_distance", 1 );
+						ad->set( ad->get_uint() + 1 );
 // 					
 // 					m_species_system->addNewSpecies( critter_new );
-				}
+					}
+					m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
 				// else
 				// {
 				// 	m_species_system->copySpecies( critter_unit, critter_new );
@@ -357,10 +365,12 @@
 		return false;
 	}
 
-	void CdCritterSystem::removeCritter( BEntity* entity, bool force_direct_deletion )
-	{
-			auto critter = dynamic_cast<CdCritter*>( entity );
-			if ( critter )
+		void CdCritterSystem::removeCritter( BEntity* entity, bool force_direct_deletion )
+		{
+			m_stats_deaths_total->set( m_stats_deaths_total->get_uint() + 1 );
+
+				auto critter = dynamic_cast<CdCritter*>( entity );
+				if ( critter )
 			{
 				// shortcut 
 					if ( critter->m_bodyparts_shortcut == 0 )

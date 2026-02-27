@@ -45,6 +45,8 @@
 				BEntity* m_dropzone_size_y;
 				BEntity* m_dropzone_size_z;
 				BEntity* m_copy_random_position;
+				BEntity* m_stats_births_total;
+				BEntity* m_stats_deaths_total;
 				
 				CdSpeciesSystem* m_species_system;
 				BEntity* m_body_system_unit_container;
@@ -79,4 +81,3 @@
 				BEntity* m_energy;
 				BEntity* m_species;
 		};
-

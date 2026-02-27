@@ -20,6 +20,8 @@
 		critter_system.h
 		control_panel.cpp
 		control_panel.h
+		life_stats_panel.cpp
+		life_stats_panel.h
 		population_controller.cpp
 		population_controller.h
 		critter_exchanger.cpp
@@ -31,5 +33,4 @@
 	ADD_LIBRARY( be_plugin_app_critterding SHARED ${plugin_SRCS} )
 	# TARGET_LINK_LIBRARIES( be_plugin_app_critterding )
 	TARGET_LINK_LIBRARIES( be_plugin_app_critterding be_plugin_opengl_modern )
-
 

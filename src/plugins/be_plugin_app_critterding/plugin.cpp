@@ -6,6 +6,7 @@
 // #include "critter_system.h"
 #include "vision_system.h"
 #include "control_panel.h"
+#include "life_stats_panel.h"
 #include "population_controller.h"
 #include "critter_exchanger.h"
 #include "commands.h"
@@ -157,6 +158,7 @@
 			auto toggleFullscreen = commands->addChild( "toggleFullscreen", new cmd_toggleFullscreen() );
 			auto launchAdminWindow = commands->addChild( "launchAdminWindow", new cmd_launchAdminWindow() );
 			auto launchControlPanel = commands->addChild( "launchControlPanel", new cmd_launchControlPanel() );
+			auto launchLifeStatsPanel = commands->addChild( "launchLifeStatsPanel", new cmd_launchLifeStatsPanel() );
 			auto launchSystemMonitor = commands->addChild( "launchSystemMonitor", new cmd_launchSystemMonitor() );
 			auto launchSelectionWindow = commands->addChild( "launchSelectionWindow", new cmd_launchSelectionWindow() );
 			auto mousePickBody = commands->addChild( "mousePickBody", new cmd_mousePickBody() );
@@ -190,6 +192,9 @@
 
 			auto binding_f3 = bindings->addChild( "f3", new BEntity_trigger() );
 			binding_f3->connectServerServer( launchSystemMonitor );
+
+			auto binding_f4 = bindings->addChild( "f4", new BEntity_trigger() );
+			binding_f4->connectServerServer( launchLifeStatsPanel );
 
 			// bindings to mouse
 			auto binding_mouse_2 = bindings->addChild( "mousebutton_down_2", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
@@ -464,6 +469,7 @@
 		, SCENE
 		, CRITTERDING
 		, CD_CONTROL_PANEL
+		, CD_LIFE_STATS_PANEL
 		, CD_POPULATION_CONTROL
 		, CD_CRITTER_EXCHANGER
 		, CD_CRITTER_SYSTEM
@@ -487,6 +493,7 @@
 					i.addClass( parent, CLASS::SCENE, "Scene" );
 					i.addClass( parent, CLASS::CRITTERDING, "Critterding" );
 					i.addClass( parent, CLASS::CD_CONTROL_PANEL, "CdControlPanel" );
+					i.addClass( parent, CLASS::CD_LIFE_STATS_PANEL, "CdLifeStatsPanel" );
 					i.addClass( parent, CLASS::CD_POPULATION_CONTROL, "CdPopulationController" );
 					i.addClass( parent, CLASS::CD_CRITTER_EXCHANGER, "CdCritterExchanger" );
 					i.addClass( parent, CLASS::CD_CRITTER_SYSTEM, "CdCritterSystem" );
@@ -513,6 +520,8 @@
 					i = new Scene();
 				else if ( type == CLASS::CD_CONTROL_PANEL )
 					i = new CdControlPanel();
+				else if ( type == CLASS::CD_LIFE_STATS_PANEL )
+					i = new CdLifeStatsPanel();
 				else if ( type == CLASS::CD_POPULATION_CONTROL )
 					i = new CdPopulationController();
 				else if ( type == CLASS::CD_CRITTER_EXCHANGER )

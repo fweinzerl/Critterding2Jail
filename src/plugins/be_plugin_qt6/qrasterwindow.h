@@ -23,6 +23,7 @@
 
 				virtual bool set( const Bstring& id, const Buint& value );
 				virtual Buint get_uint( const Bstring& id );
+				virtual bool set( const Bstring& id, const char* value );
 				virtual bool set( const Bstring& id, BEntity* value );
 				virtual BEntity* get_reference( const Bstring& id );
 

@@ -243,6 +243,7 @@
 			auto toggleFullscreen = commands->addChild( "toggleFullscreen", new cmd_toggleFullscreen() );
 			auto launchAdminWindow = commands->addChild( "launchAdminWindow", new cmd_launchAdminWindow() );
 			auto launchControlPanel = commands->addChild( "launchControlPanel", new cmd_launchControlPanel() );
+			auto launchLifeStatsPanel = commands->addChild( "launchLifeStatsPanel", new cmd_launchLifeStatsPanel() );
 			auto launchSystemMonitor = commands->addChild( "launchSystemMonitor", new cmd_launchSystemMonitor() );
 			auto launchSelectionWindow = commands->addChild( "launchSelectionWindow", new cmd_launchSelectionWindow() );
 			auto mousePickBody = commands->addChild( "mousePickBody", new cmd_mousePickBody() );
@@ -277,6 +278,9 @@
 
 			auto binding_f3 = bindings->addChild( "f3", new BEntity_trigger() );
 			binding_f3->connectServerServer( launchSystemMonitor );
+
+			auto binding_f4 = bindings->addChild( "f4", new BEntity_trigger() );
+			binding_f4->connectServerServer( launchLifeStatsPanel );
 
 			// bindings to mouse
 			auto binding_mouse_2 = bindings->addChild( "mousebutton_down_2", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window

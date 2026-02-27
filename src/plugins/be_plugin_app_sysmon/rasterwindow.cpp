@@ -12,6 +12,7 @@
 			{
 				BEntity* qrasterwindow = addChild( "QT RasterWindow", "QRasterWindow" );
 				qrasterwindow->setFps(8);
+				qrasterwindow->set("title", "CPU Usage");
 
 				// SETUP WINDOW
 					qrasterwindow->set("on_close_destroy_entity", qrasterwindow);

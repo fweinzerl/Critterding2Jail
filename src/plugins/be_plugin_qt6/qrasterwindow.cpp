@@ -112,6 +112,16 @@
 
 			return 0;
 		}
+
+		bool BQRasterWindow::set( const Bstring& id, const char* value )
+		{
+			if ( id == "title" )
+			{
+				setTitle(value);
+				return true;
+			}
+			return false;
+		}
 		
 	// PROPERTIES
 		bool BQRasterWindow::set( const Bstring& id, BEntity* value )
