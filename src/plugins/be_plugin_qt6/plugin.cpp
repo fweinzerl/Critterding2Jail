@@ -55,7 +55,9 @@
 		, QGRAPHICSPROXYWIDGET
 		, QMDIWINDOW
 		, QMAINWINDOW
+		, QMAINWINDOW_END
 		, QGROUPBOX
+		, QGROUPBOX_END
 		, QPUSHBUTTON
 		, QPUSHBUTTON_DRAGGABLE
 		, QPUSHBUTTON_DROPPABLE
@@ -99,7 +101,10 @@
 					i.addClass( parent, CLASS::QGRAPHICSPROXYWIDGET, "QGraphicsProxyWidget" );
 					i.addClass( parent, CLASS::QMDIWINDOW, "QMdiWindow" );
 					i.addClass( parent, CLASS::QMAINWINDOW, "QMainWindow" );
+					// Compatibility aliases for legacy UI trees that still reference *_end sentinels.
+					i.addClass( parent, CLASS::QMAINWINDOW_END, "QMainWindow_end" );
 					i.addClass( parent, CLASS::QGROUPBOX, "QGroupBox" );
+					i.addClass( parent, CLASS::QGROUPBOX_END, "QGroupBox_end" );
 					i.addClass( parent, CLASS::QPUSHBUTTON, "QPushButton" );
 					i.addClass( parent, CLASS::QPUSHBUTTON_DRAGGABLE, "QPushButtonDraggable" );
 					i.addClass( parent, CLASS::QPUSHBUTTON_DROPPABLE, "QPushButtonDroppable" );
@@ -164,8 +169,12 @@
 					i = new BQMdiWindow();
 				else if ( type == CLASS::QMAINWINDOW )
 					i = new BQMainWindow();
+				else if ( type == CLASS::QMAINWINDOW_END )
+					i = new BEntity();
 				else if ( type == CLASS::QGROUPBOX )
 					i = new BQGroupBox();
+				else if ( type == CLASS::QGROUPBOX_END )
+					i = new BEntity();
 				else if ( type == CLASS::QPUSHBUTTON )
 					i = new BQPushButton();
 				else if ( type == CLASS::QPUSHBUTTON_DRAGGABLE )

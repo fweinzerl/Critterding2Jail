@@ -32,6 +32,8 @@
 #include "plugins/be_plugin_bullet/be_entity_physics_entity.h"
 #include "kernel/be_plugin_base_entity_types.h"
 #include "critter_system.h"
+#include <cstdlib>
+#include <iostream>
 
 	void CdVisionSystem::construct()
 	{
@@ -39,6 +41,8 @@
 		// m_print->set( true );
 		m_critter_sightrange = addChild("sight_range", new BEntity_float());
 		m_critter_sightrange->set( 8.0f );
+		m_retina_size = addChild("retina_size", new BEntity_uint());
+		m_retina_size->set( Buint(6) );
 		m_update_every_n_ticks = addChild("update_every_n_ticks", new BEntity_uint());
 		m_update_every_n_ticks->set( Buint(5) );
 		m_tick_counter = 0;
@@ -47,7 +51,12 @@
 		
 		m_turn_180 = btTransform( btQuaternion( SIMD_PI, 0.0f, 0.0f ) );
 
-		m_critter_retinasize = 6; // FIXME max 8?
+		m_critter_retinasize = m_retina_size->get_uint();
+		if ( m_critter_retinasize == 0 )
+		{
+			std::cerr << "ERROR: vision_system: retina_size must be > 0" << std::endl;
+			std::exit(1);
+		}
 		m_retinasperrow = 2048 / m_critter_retinasize;
 
 		// vision retina allocation
@@ -157,7 +166,8 @@
 
 					if ( critter->m_physics_component_shortcut == 0 )
 					{
-						critter->m_physics_component_shortcut = critter->getChild("external_body", 1)->get_reference()->getChild("body_fixed1", 1)->getChild("bodyparts", 1)->getChild("external_bodypart_physics", 1)->get_reference();
+						std::cerr << "ERROR: vision_system: missing required critter physics shortcut" << std::endl;
+						std::exit(1);
 					}
 
 					auto bodypart_to_attach_cam = dynamic_cast<BPhysicsEntity*>( critter->m_physics_component_shortcut )->getPhysicsComponent();
@@ -235,19 +245,18 @@
 								}
 							}
 						}
-						if ( !critter->m_brain_vision_input_start )
-						{
-							++critter_counter;
-							continue;
-						}
-						const auto& brain_inputs_children_vector = critter->m_brain_inputs->children();
-						auto brain_input_index = critter->m_brain_vision_input_start_index;
-						if ( brain_input_index >= brain_inputs_children_vector.size() )
-						{
-							critter->m_brain_vision_input_start = 0;
-							++critter_counter;
-							continue;
-						}
+							if ( !critter->m_brain_vision_input_start )
+							{
+								std::cerr << "ERROR: vision_system: missing required brain vision input start" << std::endl;
+								std::exit(1);
+							}
+							const auto& brain_inputs_children_vector = critter->m_brain_inputs->children();
+							auto brain_input_index = critter->m_brain_vision_input_start_index;
+							if ( brain_input_index >= brain_inputs_children_vector.size() )
+							{
+								std::cerr << "ERROR: vision_system: brain vision input index out of range" << std::endl;
+								std::exit(1);
+							}
 
 						// FEED
 						calcFramePos( critter_counter );

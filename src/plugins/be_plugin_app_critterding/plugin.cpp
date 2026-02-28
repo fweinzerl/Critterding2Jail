@@ -14,7 +14,8 @@
 // #include "plugins/be_plugin_bullet/be_entity_transform.h" // FIXME work this away
 #include "plugins/be_plugin_opengl_modern/be_entity_camera.h"
 #include "opengl_setup.h"
-// #include <iostream>
+#include <iostream>
+#include <cstdlib>
 
 // 	void Scene::construct()
 // 	{
@@ -461,7 +462,8 @@
 			{
 				if ( critter->m_bodyparts_shortcut == 0 )
 				{
-					critter->m_bodyparts_shortcut = critter->getChild( "external_body", 1 )->get_reference()->getChild( "body_fixed1", 1 )->getChild( "bodyparts", 1 );
+					std::cerr << "ERROR: scene::findCritter: missing required bodyparts shortcut" << std::endl;
+					std::exit(1);
 				}
 
 				for_all_children_of3( critter->m_bodyparts_shortcut )
@@ -514,6 +516,7 @@
 		, CD_FOOD
 		, CD_BODY_SYSTEM
 		, CD_BODY // FIXME REMOVE LEGACY
+		, CD_BODY_PLAN
 		, CD_BODY_FIXED1
 		, OPENGL_SETUP
 	};
@@ -538,6 +541,7 @@
 					i.addClass( parent, CLASS::CD_FOOD, "CdFood" );
 					i.addClass( parent, CLASS::CD_BODY_SYSTEM, "CdBodySystem" );
 					i.addClass( parent, CLASS::CD_BODY, "CdBody" );
+					i.addClass( parent, CLASS::CD_BODY_PLAN, "CdBodyPlan" );
 					i.addClass( parent, CLASS::CD_BODY_FIXED1, "BodyFixed1" );
 					i.addClass( parent, CLASS::OPENGL_SETUP, "OpenGL_Setup" );
 				return 0;
@@ -576,8 +580,10 @@
 					i = new BodySystem();
 				else if ( type == CLASS::CD_BODY )
 					i = new BEntity();
+				else if ( type == CLASS::CD_BODY_PLAN )
+					i = new CdBodyPlan();
 				else if ( type == CLASS::CD_BODY_FIXED1 )
-					i = new BodyFixed1();
+					i = new CdBodyPlan();
 				else if ( type == CLASS::OPENGL_SETUP )
 					i = new OpenGL_Setup();
 

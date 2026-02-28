@@ -2,6 +2,7 @@
 #include "kernel/be_entity_core_types.h"
 #include "critter_system.h"
 #include "food_system.h"
+#include <cstdlib>
 #include <iostream>
 
 	void CdPopulationController::construct()
@@ -47,7 +48,8 @@
 						{
 							if ( critter->m_transform_shortcut == 0 )
 							{
-								critter->m_transform_shortcut = critter->getChild("external_body", 1)->get_reference()->getChild("body_fixed1", 1)->getChild("bodyparts", 1)->getChild("external_bodypart_physics", 1)->get_reference()->getChild("transform", 1);
+								std::cerr << "ERROR: population_controller: missing required critter transform shortcut" << std::endl;
+								std::exit(1);
 							}
 
 							if ( critter->m_transform_shortcut->getChild("position_y", 1)->get_float() < m_below_y_trigger->get_float() )

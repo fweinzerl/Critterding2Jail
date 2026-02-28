@@ -1,5 +1,10 @@
 #include "commands.h"
+#include "critter_system.h"
+#include "body_runtime_access.h"
 #include "plugins/be_plugin_bullet/bullet3/src/LinearMath/btVector3.h"
+#include <cstdlib>
+#include <iostream>
+#include <vector>
 // #include <iostream>
 
 	bool cmd_toggleFullscreen::set()
@@ -263,9 +268,9 @@
 			{
 				auto cd_app = scene->getChild( "Critterding", 1 );
 				if ( cd_app )
-				{
-					// FIND HIT ENTITY
-						BEntity* hit_entity(0);
+					{
+						// FIND HIT ENTITY
+							BEntity* hit_entity(0);
 
 						// single thread
 							auto external_raycaster = cd_app->getChild( "external_raycaster", 1 );
@@ -281,56 +286,131 @@
 								float shortest( 0.0f );
 								for_all_children_of( raycasters )
 								{
-									auto source_entity = (*child)->get_reference()->getChild( "source", 1 );
+									auto raycaster = (*child)->get_reference();
+									auto ray_hit_entity = raycaster->getChild( "hit_entity", 1 );
+									if ( ray_hit_entity == 0 || ray_hit_entity->get_reference() == 0 )
+									{
+										continue;
+									}
+
+									auto source_entity = raycaster->getChild( "source", 1 );
 									btVector3 hit_source_vector( source_entity->getChild( "x", 1 )->get_float(), source_entity->getChild( "y", 1 )->get_float(), source_entity->getChild( "z", 1 )->get_float() );
-									auto hit_position_entity = (*child)->get_reference()->getChild( "hit_position", 1 );
+									auto hit_position_entity = raycaster->getChild( "hit_position", 1 );
 									btVector3 hit_position_vector( hit_position_entity->getChild( "x", 1 )->get_float(), hit_position_entity->getChild( "y", 1 )->get_float(), hit_position_entity->getChild( "z", 1 )->get_float() );
 									auto distance = hit_source_vector.distance( hit_position_vector );
 
 									if ( distance < shortest || shortest == 0.0f )
 									{
-										hit_entity = (*child)->get_reference()->getChild( "hit_entity", 1 );
+										hit_entity = ray_hit_entity;
 										shortest = distance;
 									}
 								}
 							}
 
-					if ( hit_entity != 0 )
-					{
-						if ( hit_entity->get_reference() != 0 )
+						if ( hit_entity != 0 )
 						{
-							// CRITTER
+							if ( hit_entity->get_reference() != 0 )
+							{
 								BEntity* selectedEntity(0);
-								if ( hit_entity->get_reference()->name() == "bodypart_central" || hit_entity->get_reference()->name() == "bodypart_left" || hit_entity->get_reference()->name() == "bodypart_right" )
+								std::vector<BEntity*> critter_containers;
+								std::vector<BEntity*> food_containers;
 								{
-									auto critter_system = hit_entity->parent()->parent()->parent()->getChild( "critter_system", 1 );
-									auto unit_container = critter_system->getChild( "unit_container", 1 );
-									if ( unit_container )
+									auto critter_system = cd_app->getChild( "critter_system", 1 );
+									if ( critter_system )
 									{
-										for_all_children_of2( unit_container )
+										auto unit_container = critter_system->getChild( "unit_container", 1 );
+										if ( unit_container )
 										{
-											if ( selectedEntity != 0 )
-												break;
+											critter_containers.push_back( unit_container );
+										}
+									}
+									auto food_system = cd_app->getChild( "food_system", 1 );
+									if ( food_system )
+									{
+										auto unit_container = food_system->getChild( "unit_container", 1 );
+										if ( unit_container )
+										{
+											food_containers.push_back( unit_container );
+										}
+									}
 
-											for_all_children_of3( (*child2)->getChild( "external_body", 1 )->get_reference()->getChild( "body_fixed1", 1 )->getChild( "bodyparts", 1 ) )
+									for_all_children_of( cd_app )
+									{
+										if ( (*child)->class_id() != std::string("thread") )
+										{
+											continue;
+										}
+										auto local_cd = (*child)->getChild( "Critterding", 1 );
+										if ( local_cd == 0 )
+										{
+											continue;
+										}
+										auto local_critter_system = local_cd->getChild( "critter_system", 1 );
+										if ( local_critter_system )
+										{
+											auto unit_container = local_critter_system->getChild( "unit_container", 1 );
+											if ( unit_container )
 											{
-												if ( (*child3)->get_reference() == hit_entity->get_reference() )
-												{
-													selectedEntity = *child2;
-												}
+												critter_containers.push_back( unit_container );
+											}
+										}
+										auto local_food_system = local_cd->getChild( "food_system", 1 );
+										if ( local_food_system )
+										{
+											auto unit_container = local_food_system->getChild( "unit_container", 1 );
+											if ( unit_container )
+											{
+												food_containers.push_back( unit_container );
 											}
 										}
 									}
 								}
 
-							// FOOD
-								else if ( hit_entity->get_reference()->name() == "physics_entity_food" )
+								// CRITTER
+								for ( auto* unit_container : critter_containers )
 								{
-									auto food_system = hit_entity->parent()->parent()->parent()->getChild( "food_system", 1 );
-
-									auto unit_container = food_system->getChild( "unit_container", 1 );
-									if ( unit_container )
+									if ( selectedEntity != 0 )
 									{
+										break;
+									}
+									for_all_children_of2( unit_container )
+									{
+										if ( selectedEntity != 0 )
+											break;
+
+										auto critter = dynamic_cast<CdCritter*>( *child2 );
+										if ( !critter )
+										{
+											continue;
+										}
+										if ( critter->m_bodyparts_shortcut == 0 )
+										{
+											critter->m_bodyparts_shortcut = cd_body_runtime::find_bodyparts_from_critter( critter );
+											if ( critter->m_bodyparts_shortcut == 0 )
+											{
+												std::cerr << "ERROR: launchSelectionWindow: missing required bodyparts shortcut" << std::endl;
+												std::exit(1);
+											}
+										}
+										for_all_children_of3( critter->m_bodyparts_shortcut )
+										{
+											if ( (*child3)->get_reference() == hit_entity->get_reference() )
+											{
+												selectedEntity = *child2;
+											}
+										}
+									}
+								}
+
+								// FOOD
+								if ( selectedEntity == 0 )
+								{
+									for ( auto* unit_container : food_containers )
+									{
+										if ( selectedEntity != 0 )
+										{
+											break;
+										}
 										for_all_children_of2( unit_container )
 										{
 											if ( selectedEntity != 0 )

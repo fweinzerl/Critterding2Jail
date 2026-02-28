@@ -48,10 +48,11 @@
 			unsigned int retinaRowLength;
 			unsigned int visionPosition;
 			
-			BEntity* m_print;
-			BEntity* m_critter_sightrange;
-			BEntity* m_e_scale_x;
-			BEntity* m_update_every_n_ticks;
+				BEntity* m_print;
+				BEntity* m_critter_sightrange;
+				BEntity* m_retina_size;
+				BEntity* m_e_scale_x;
+				BEntity* m_update_every_n_ticks;
 			unsigned int m_tick_counter;
 			
 			float m_buffer[16];

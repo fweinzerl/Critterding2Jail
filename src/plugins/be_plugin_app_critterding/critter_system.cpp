@@ -1,9 +1,72 @@
 #include "critter_system.h"
 #include "kernel/be_entity_core_types.h"
+#include "body_runtime_access.h"
 // #include "species_system.h"
 #include "plugins/be_plugin_bullet/be_entity_mousepicker.h"
+#include <cmath>
 #include <limits>
 // #include <iostream>
+
+namespace
+{
+	constexpr float CD_TWO_PI = 6.28318530717958647692f;
+
+	unsigned int find_vision_retina_size_or_die(BEntity* critter_system)
+	{
+		auto bin = critter_system->topParent()->getChild("bin", 1);
+		if ( bin == 0 )
+		{
+			std::cerr << "ERROR: critter_system: missing bin root while reading vision retina size" << std::endl;
+			std::exit(1);
+		}
+		auto app = bin->getChild("Critterding", 1);
+		if ( app == 0 )
+		{
+			std::cerr << "ERROR: critter_system: missing Critterding root while reading vision retina size" << std::endl;
+			std::exit(1);
+		}
+		auto vision_system = app->getChild("vision_system", 1);
+		if ( vision_system == 0 )
+		{
+			std::cerr << "ERROR: critter_system: missing vision_system while reading retina size" << std::endl;
+			std::exit(1);
+		}
+		auto retina_size = vision_system->getChild("retina_size", 1);
+		if ( retina_size == 0 || retina_size->get_uint() == 0 )
+		{
+			std::cerr << "ERROR: critter_system: invalid vision retina_size" << std::endl;
+			std::exit(1);
+		}
+		return retina_size->get_uint();
+	}
+}
+
+	void CdCritterSystem::refreshBodyShortcuts(CdCritter* critter)
+	{
+		if ( critter == 0 )
+		{
+			return;
+		}
+
+		critter->m_body_root_shortcut = cd_body_runtime::find_body_root_from_critter( critter );
+		if ( critter->m_body_root_shortcut == 0 )
+		{
+			critter->m_constraints_shortcut = 0;
+			critter->m_bodyparts_shortcut = 0;
+			critter->m_physics_component_shortcut = 0;
+			critter->m_transform_shortcut = 0;
+			return;
+		}
+
+		critter->m_constraints_shortcut = cd_body_runtime::find_constraints_from_body_root( critter->m_body_root_shortcut );
+		critter->m_bodyparts_shortcut = critter->m_body_root_shortcut->getChild( "bodyparts", 1 );
+		critter->m_physics_component_shortcut = cd_body_runtime::find_primary_bodypart_physics_from_critter( critter );
+		critter->m_transform_shortcut = 0;
+		if ( critter->m_physics_component_shortcut )
+		{
+			critter->m_transform_shortcut = critter->m_physics_component_shortcut->getChild( "transform", 1 );
+		}
+	}
  
 	void CdCritterSystem::construct()
 	{
@@ -89,15 +152,19 @@
 			m_learning_reward_tick_cost = settings->addChild( "learning_reward_tick_cost", new BEntity_float() );
 			m_learning_explore_mutation_chance = settings->addChild( "learning_explore_mutation_chance", new BEntity_uint() );
 			m_learning_enabled->set( true );
-			m_learning_episode_ticks->set( Buint(30) );
+			m_learning_episode_ticks->set( Buint(300) );
 			m_learning_reward_energy_weight->set( Bfloat(0.02f) );
 			m_learning_reward_green_weight->set( Bfloat(0.40f) );
 			m_learning_reward_tick_cost->set( Bfloat(0.01f) );
 			m_learning_explore_mutation_chance->set( Buint(5) );
-			m_stats_learning_avg_episode_reward = stats->addChild( "learning_avg_episode_reward", new BEntity_float() );
-			m_stats_learning_mutations_total = stats->addChild( "learning_mutations_total", new BEntity_uint() );
-			m_stats_learning_avg_episode_reward->set( Bfloat(0.0f) );
-			m_stats_learning_mutations_total->set( Buint(0) );
+				m_stats_learning_avg_episode_reward = stats->addChild( "learning_avg_episode_reward", new BEntity_float() );
+				m_stats_learning_mutations_total = stats->addChild( "learning_mutations_total", new BEntity_uint() );
+				m_stats_learning_avg_episode_reward->set( Bfloat(0.0f) );
+				m_stats_learning_mutations_total->set( Buint(0) );
+				m_oscillator_frequency_default = settings->addChild( "oscillator_frequency_default", new BEntity_float() );
+				m_oscillator_frequency_mutation_delta = settings->addChild( "oscillator_frequency_mutation_delta", new BEntity_float() );
+				m_oscillator_frequency_default->set( Bfloat(0.08f) );
+				m_oscillator_frequency_mutation_delta->set( Bfloat(0.01f) );
 		
 		m_mouse_picker = 0;
 		auto ext = parent()->getChild("external_mousepicker", 1);
@@ -133,6 +200,7 @@
 				{
 					critter_unit->setAge( 1+critter_unit->age() );
 					total_energy_in_entities += critter_unit->energy();
+					updateOscillatorInputs( critter_unit );
 					// critter_unit->m_always_firing_input->onUpdate();
 				}
 			}
@@ -228,18 +296,19 @@
 					// BODY
 						// auto newBody = body_unit_system->addChild( "body", new BBody() );
 						auto newBody = m_body_system_unit_container->addChild( "body", new BEntity() );
-						auto fixed_1 = newBody->addChild( "body_fixed1", "BodyFixed1" );
+						auto body_root = newBody->addChild( "body", "CdBodyPlan" );
 						
 						// auto fixed_1 = body_unit_system->addChild( "body_fixed1", "BodyFixed1" );
 						
 						// auto fixed_1 = newBody->addChild( "body_fixed1", new BEntity() );
 
-						// BodyFixed1Maker m;
+						// CdBodyPlanBuilder m;
 						// m.make( fixed_1 );
 						
 							
 						// REFERENCE TO EXTERNAL CHILD
 							critter_unit->addChild( "external_body", new BEntity_external() )->set( newBody );
+							refreshBodyShortcuts( critter_unit );
 
 					// BRAIN
 						critter_unit->m_brain = m_brain_system->getChild( "unit_container", 1)->addChild( "brain", "Brain" );
@@ -248,7 +317,7 @@
 						// reference body constraints as brain outputs
 						auto outputs = critter_unit->m_brain->getChild( "outputs", 1 );
 						auto constraints_ref = outputs->addChild( "bullet_constraints", new BEntity_reference() );
-						auto constraints = fixed_1->getChild( "constraints", 1 );
+						auto constraints = critter_unit->m_constraints_shortcut;
 						constraints_ref->set( constraints );
 						
 						// motor neurons
@@ -260,8 +329,10 @@
 						auto motor_neurons_ref = outputs->addChild( "motor_neurons_ref", new BEntity_reference() );
 						motor_neurons_ref->set( motor_neurons );
 						
-						// INPUTS
-							auto inputs = critter_unit->m_brain->getChild( "inputs", 1 );
+							// INPUTS
+								auto inputs = critter_unit->m_brain->getChild( "inputs", 1 );
+								inputs->addChild( "osc_sin", new BEntity_float() );
+								inputs->addChild( "osc_cos", new BEntity_float() );
 
 							// ALWAYS FIRING NEURON
 								// critter_unit->m_always_firing_input = inputs->addChild( "always_firing_input", new BEntity_float() );
@@ -290,7 +361,7 @@
 								}
 
 							// VISION
-								unsigned int retinasize = 8;
+								const unsigned int retinasize = find_vision_retina_size_or_die(this);
 								do_times( retinasize*retinasize )
 								{
 									inputs->addChild( "vision_value_R", new BEntity_float() );
@@ -300,10 +371,22 @@
 								}
 
 					
-						critter_unit->m_brain = m_brain_system->getChildCustom( critter_unit->m_brain, "new" );
+							critter_unit->m_brain = m_brain_system->getChildCustom( critter_unit->m_brain, "new" );
 
-						// REFERENCE TO EXTERNAL CHILD
-							critter_unit->addChild( "external_brain", new BEntity_external() )->set( critter_unit->m_brain );
+							// REFERENCE TO EXTERNAL CHILD
+								critter_unit->addChild( "external_brain", new BEntity_external() )->set( critter_unit->m_brain );
+								auto oscillator = critter_unit->addChild( "oscillator", new BEntity() );
+								auto frequency = oscillator->addChild( "frequency", new BEntity_float() );
+								auto phase = oscillator->addChild( "phase", new BEntity_float() );
+								frequency->set( m_oscillator_frequency_default->get_float() );
+								phase->set( Bfloat(0.0f) );
+								critter_unit->m_osc_frequency_entity = frequency;
+								critter_unit->m_osc_phase_entity = phase;
+								critter_unit->m_osc_phase = 0.0f;
+								critter_unit->m_brain_inputs = critter_unit->m_brain->getChild( "inputs", 1 );
+								critter_unit->m_osc_input_sin = critter_unit->m_brain_inputs->getChild( "osc_sin", 1 );
+								critter_unit->m_osc_input_cos = critter_unit->m_brain_inputs->getChild( "osc_cos", 1 );
+								updateOscillatorInputs( critter_unit );
 
 					// // // SPECIES
 					// 	m_species_system->addNewSpecies( critter_unit );
@@ -323,6 +406,7 @@
 			// COPY CRITTER
 				auto critter_new = dynamic_cast<CdCritter*>( m_entityCopy.copyEntity( critter_unit ) );
 				critter_new->getChild( "age", 1 )->set( Buint(0) );
+				refreshBodyShortcuts( critter_new );
 				resetLearningState( critter_new );
 				// critter_new->getChild( "energy", 1 )->set( Buint(0) );
 
@@ -347,14 +431,39 @@
 					}
 				}
 
-				auto bodyparts_old = critter_unit->getChild( "external_body", 1 )->get_reference()->getChild( "body_fixed1", 1 )->getChild( "bodyparts", 1 );
-				critter_new->m_bodyparts_shortcut = critter_new->getChild( "external_body", 1 )->get_reference()->getChild( "body_fixed1", 1 )->getChild( "bodyparts", 1 );
+				auto bodyparts_old = critter_unit->m_bodyparts_shortcut;
+				if ( bodyparts_old == 0 )
+				{
+					refreshBodyShortcuts( critter_unit );
+					bodyparts_old = critter_unit->m_bodyparts_shortcut;
+				}
+				if ( critter_new->m_bodyparts_shortcut == 0 )
+				{
+					refreshBodyShortcuts( critter_new );
+				}
+				if ( bodyparts_old == 0 || critter_new->m_bodyparts_shortcut == 0 )
+				{
+					std::cerr << "ERROR: procreate_critter: missing bodyparts shortcut in source or copy" << std::endl;
+					std::exit(1);
+				}
 				
 				const auto& children_old = bodyparts_old->children();
+				const auto& children_new = critter_new->m_bodyparts_shortcut->children();
+				if ( children_old.size() != children_new.size() )
+				{
+					std::cerr << "ERROR: procreate_critter: bodyparts size mismatch source=" << children_old.size()
+					          << " copy=" << children_new.size() << std::endl;
+					std::exit(1);
+				}
 				auto old_child = children_old.begin();
 
 				for_all_children_of3( critter_new->m_bodyparts_shortcut )
 				{
+					if ( old_child == children_old.end() )
+					{
+						std::cerr << "ERROR: procreate_critter: source bodyparts iterator exhausted early" << std::endl;
+						std::exit(1);
+					}
 					auto t = (*child3)->get_reference()->getChild( "transform", 1 );
 					auto oldt = (*old_child)->get_reference()->getChild( "transform", 1 );
 					if ( t )
@@ -368,7 +477,7 @@
 				}
 			}
 
-			// MUTATE CRITTER BRAIN
+				// MUTATE CRITTER BRAIN
 
 				// get brain from critter
 				BEntity* brain_new;
@@ -383,15 +492,34 @@
 					}
 				}
 				
-				// ACTUAL MUTATE
-					if ( m_brain_system->set( "mutate", brain_new ) )
+					// ACTUAL MUTATE
+						if ( m_brain_system->set( "mutate", brain_new ) )
 					{
 						auto ad = critter_new->getChild( "adam_distance", 1 );
 						ad->set( ad->get_uint() + 1 );
 // 					
 // 					m_species_system->addNewSpecies( critter_new );
-					}
-					m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
+						}
+						ensureOscillatorShortcuts( critter_unit );
+						ensureOscillatorShortcuts( critter_new );
+						const auto base_frequency = critter_unit->m_osc_frequency_entity->get_float();
+						float mutation_delta(0.0f);
+						if ( m_rng )
+						{
+							m_rng->set( "min", Bint(-1000) );
+							m_rng->set( "max", Bint(1000) );
+							mutation_delta = 0.001f * m_rng->get_int() * m_oscillator_frequency_mutation_delta->get_float();
+						}
+						float new_frequency = base_frequency + mutation_delta;
+						if ( new_frequency < 0.0001f )
+						{
+							new_frequency = 0.0001f;
+						}
+						critter_new->m_osc_frequency_entity->set( Bfloat(new_frequency) );
+						critter_new->m_osc_phase = 0.0f;
+						critter_new->m_osc_phase_entity->set( Bfloat(0.0f) );
+						updateOscillatorInputs( critter_new );
+						m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
 				// else
 				// {
 				// 	m_species_system->copySpecies( critter_unit, critter_new );
@@ -422,6 +550,74 @@
 		critter->m_learning_last_green_entity = learning->getChild( "last_green", 1 );
 	}
 
+	void CdCritterSystem::ensureOscillatorShortcuts(CdCritter* critter)
+	{
+		if ( critter->m_osc_frequency_entity == 0 )
+		{
+			auto oscillator = critter->getChild( "oscillator", 1 );
+			if ( oscillator == 0 )
+			{
+				std::cerr << "ERROR: critter_system: missing required oscillator entity" << std::endl;
+				std::exit(1);
+			}
+			critter->m_osc_frequency_entity = oscillator->getChild( "frequency", 1 );
+			critter->m_osc_phase_entity = oscillator->getChild( "phase", 1 );
+			if ( critter->m_osc_frequency_entity == 0 || critter->m_osc_phase_entity == 0 )
+			{
+				std::cerr << "ERROR: critter_system: missing required oscillator frequency/phase entities" << std::endl;
+				std::exit(1);
+			}
+			critter->m_osc_phase = critter->m_osc_phase_entity->get_float();
+		}
+		if ( critter->m_osc_input_sin == 0 || critter->m_osc_input_cos == 0 )
+		{
+			if ( critter->m_brain_inputs == 0 )
+			{
+				auto external_brain = critter->getChild( "external_brain", 1 );
+				if ( external_brain == 0 || external_brain->get_reference() == 0 )
+				{
+					std::cerr << "ERROR: critter_system: missing required external_brain for oscillator inputs" << std::endl;
+					std::exit(1);
+				}
+				critter->m_brain_inputs = external_brain->get_reference()->getChild( "inputs", 1 );
+				if ( critter->m_brain_inputs == 0 )
+				{
+					std::cerr << "ERROR: critter_system: missing required brain inputs root for oscillator" << std::endl;
+					std::exit(1);
+				}
+			}
+			critter->m_osc_input_sin = critter->m_brain_inputs->getChild( "osc_sin", 1 );
+			critter->m_osc_input_cos = critter->m_brain_inputs->getChild( "osc_cos", 1 );
+			if ( critter->m_osc_input_sin == 0 || critter->m_osc_input_cos == 0 )
+			{
+				std::cerr << "ERROR: critter_system: missing required oscillator brain inputs" << std::endl;
+				std::exit(1);
+			}
+		}
+	}
+
+	void CdCritterSystem::updateOscillatorInputs(CdCritter* critter)
+	{
+		ensureOscillatorShortcuts( critter );
+
+		auto frequency = critter->m_osc_frequency_entity->get_float();
+		if ( frequency < 0.0001f )
+		{
+			frequency = 0.0001f;
+			critter->m_osc_frequency_entity->set( Bfloat(frequency) );
+		}
+
+		critter->m_osc_phase += frequency;
+		if ( critter->m_osc_phase > CD_TWO_PI )
+		{
+			critter->m_osc_phase = std::fmod( critter->m_osc_phase, CD_TWO_PI );
+		}
+		critter->m_osc_phase_entity->set( Bfloat(critter->m_osc_phase) );
+
+		critter->m_osc_input_sin->set( Bfloat(std::sin(critter->m_osc_phase)) );
+		critter->m_osc_input_cos->set( Bfloat(std::cos(critter->m_osc_phase)) );
+	}
+
 	void CdCritterSystem::resetLearningState(CdCritter* critter)
 	{
 		ensureLearningShortcuts( critter );
@@ -438,7 +634,7 @@
 		critter->m_learning_last_green_entity->set( Bfloat(0.0f) );
 	}
 
-	float CdCritterSystem::readVisionGreenSum(CdCritter* critter)
+		float CdCritterSystem::readVisionGreenSum(CdCritter* critter)
 	{
 		if ( critter->m_brain_inputs == 0 )
 		{
@@ -465,7 +661,8 @@
 		const auto& inputs = critter->m_brain_inputs->children();
 		const auto start = critter->m_brain_vision_input_start_index;
 		const auto green_start = start + 1;
-		const auto pixels = 8u * 8u;
+		const auto retina_size = find_vision_retina_size_or_die(this);
+		const auto pixels = retina_size * retina_size;
 		float green_sum(0.0f);
 		for ( unsigned int i = 0; i < pixels; ++i )
 		{
@@ -673,7 +870,7 @@
 				// shortcut 
 					if ( critter->m_bodyparts_shortcut == 0 )
 					{
-						critter->m_bodyparts_shortcut = critter->getChild( "external_body", 1 )->get_reference()->getChild( "body_fixed1", 1 )->getChild( "bodyparts", 1 );
+						refreshBodyShortcuts( critter );
 					}
 
 				// COLLISIONS
@@ -741,6 +938,11 @@
 		m_brain_inputs = 0;
 		m_brain_vision_input_start = 0;
 		m_brain_vision_input_start_index = 0;
+		m_osc_input_sin = 0;
+		m_osc_input_cos = 0;
+		m_osc_frequency_entity = 0;
+		m_osc_phase_entity = 0;
+		m_osc_phase = 0.0f;
 		m_learning_initialized = false;
 		m_learning_episode_tick = 0;
 		m_learning_episode_reward = 0.0f;
@@ -759,6 +961,8 @@
 		m_learning_last_reward_entity->set( Bfloat(0.0f) );
 		m_learning_last_green_entity->set( Bfloat(0.0f) );
 		m_transform_shortcut = 0;
+		m_body_root_shortcut = 0;
+		m_constraints_shortcut = 0;
 		m_physics_component_shortcut = 0;
 		m_bodyparts_shortcut = 0;
 	}

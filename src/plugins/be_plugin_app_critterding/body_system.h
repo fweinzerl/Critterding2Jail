@@ -40,6 +40,7 @@
 				BEntity* m_bodypart_friction;
 				BEntity* m_bodypart_restitution;
 				BEntity* m_bodypart_density;
+				BEntity* m_body_plan_file;
 
 				// BEntity* m_mutationweight_bodypart_add;
 				// BEntity* m_mutationweight_bodypart_remove;
@@ -56,12 +57,11 @@
 				
 		};
 
-		class BodyFixed1Maker
+		class CdBodyPlanBuilder
 		{
 			public:
-				BodyFixed1Maker() : m_rng(0) {};
-				// const char* class_id() const { return "BodyFixed1"; }
-				virtual ~BodyFixed1Maker() {};
+				CdBodyPlanBuilder() : m_rng(0) {};
+				virtual ~CdBodyPlanBuilder() {};
 
 				void make( BEntity* entity_parent );
 				BEntity* tergite_simple( BEntity* body, float central_bodypart_position_x, float central_bodypart_position_y, float central_bodypart_position_z, float central_bodypart_scale_x, float central_bodypart_scale_y, float central_bodypart_scale_z, float extra_bodypart_scale_x, float extra_bodypart_scale_y, float extra_bodypart_scale_z );
@@ -72,12 +72,12 @@
 		};
 		
 		
-		class BodyFixed1 : public BEntity
+		class CdBodyPlan : public BEntity
 		{
 			public:
-				BodyFixed1() : m_rng(0) {};
-				const char* class_id() const { return "BodyFixed1"; }
-				virtual ~BodyFixed1() {};
+				CdBodyPlan() : m_rng(0) {};
+				const char* class_id() const { return "CdBodyPlan"; }
+				virtual ~CdBodyPlan() {};
 
 				void construct();
 				BEntity* tergite_simple( float central_bodypart_position_x, float central_bodypart_position_y, float central_bodypart_position_z, float central_bodypart_scale_x, float central_bodypart_scale_y, float central_bodypart_scale_z, float extra_bodypart_scale_x, float extra_bodypart_scale_y, float extra_bodypart_scale_z );
@@ -89,3 +89,11 @@
 				virtual BEntity* customCopy( BEntity* to_parent, BEntity* entity, std::map<BEntity*, BEntity*>& translation_map );
 		};
 
+		// Legacy alias for older serialized entities and plugin class lookups.
+		class BodyFixed1 : public CdBodyPlan
+		{
+			public:
+				BodyFixed1() : CdBodyPlan() {};
+				const char* class_id() const { return "BodyFixed1"; }
+				virtual ~BodyFixed1() {};
+		};

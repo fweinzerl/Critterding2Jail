@@ -1,8 +1,38 @@
 #include "critter_thread_mesher.h"
 #include "kernel/be_entity_core_types.h"
 #include "plugins/be_plugin_app_critterding/critter_system.h"
+#include "plugins/be_plugin_app_critterding/body_runtime_access.h"
 // #include "critter_system.h"
 #include <iostream>
+#include <cstdlib>
+
+namespace
+{
+	void refresh_critter_body_shortcuts(CdCritter* critter)
+	{
+		if ( critter == 0 )
+		{
+			return;
+		}
+		critter->m_body_root_shortcut = cd_body_runtime::find_body_root_from_critter( critter );
+		if ( critter->m_body_root_shortcut == 0 )
+		{
+			critter->m_constraints_shortcut = 0;
+			critter->m_bodyparts_shortcut = 0;
+			critter->m_physics_component_shortcut = 0;
+			critter->m_transform_shortcut = 0;
+			return;
+		}
+		critter->m_constraints_shortcut = cd_body_runtime::find_constraints_from_body_root( critter->m_body_root_shortcut );
+		critter->m_bodyparts_shortcut = critter->m_body_root_shortcut->getChild( "bodyparts", 1 );
+		critter->m_physics_component_shortcut = cd_body_runtime::find_primary_bodypart_physics_from_critter( critter );
+		critter->m_transform_shortcut = 0;
+		if ( critter->m_physics_component_shortcut )
+		{
+			critter->m_transform_shortcut = critter->m_physics_component_shortcut->getChild( "transform", 1 );
+		}
+	}
+}
 
 	void CdCritterThreadMesher::construct()
 	{
@@ -34,7 +64,12 @@
 			{
 				if ( critter->m_transform_shortcut == 0 )
 				{
-					critter->m_transform_shortcut = (*child)->getChild("external_body", 1)->get_reference()->getChild("body_fixed1", 1)->getChild("bodyparts", 1)->getChild("external_bodypart_physics", 1)->get_reference()->getChild("transform", 1);
+					refresh_critter_body_shortcuts( critter );
+					if ( critter->m_transform_shortcut == 0 )
+					{
+						std::cerr << "ERROR: critter_thread_mesher: missing required critter transform shortcut" << std::endl;
+						std::exit(1);
+					}
 				}
 
 				if ( m_x_active->get_bool() )
@@ -99,6 +134,7 @@
 			// COPY CRITTER
 			auto entity = value->getChild("entity")->get_reference();
 			auto critter_new = dynamic_cast<CdCritter*>( m_entityCopy.copyEntity( entity, value->getChild("target")->get_reference() ) );
+			auto critter_old = dynamic_cast<CdCritter*>( entity );
 
 			// FIXME should be inherent?
 			// AGE, ENERGY, AD
@@ -114,14 +150,33 @@
 
 
 			// POSITION BODYPARTS
-				auto bodyparts_old = entity->getChild( "external_body", 1 )->get_reference()->getChild( "body_fixed1", 1 )->getChild( "bodyparts", 1 );
-				critter_new->m_bodyparts_shortcut = critter_new->getChild( "external_body", 1 )->get_reference()->getChild( "body_fixed1", 1 )->getChild( "bodyparts", 1 );
+				refresh_critter_body_shortcuts( critter_old );
+				refresh_critter_body_shortcuts( critter_new );
+				auto bodyparts_old = critter_old->m_bodyparts_shortcut;
+				auto bodyparts_new = critter_new->m_bodyparts_shortcut;
+				if ( bodyparts_old == 0 || bodyparts_new == 0 )
+				{
+					std::cerr << "ERROR: migrate_critter: missing bodyparts shortcut in source or copy" << std::endl;
+					std::exit(1);
+				}
 
 				const auto& children_old = bodyparts_old->children();
+				const auto& children_new = bodyparts_new->children();
+				if ( children_old.size() != children_new.size() )
+				{
+					std::cerr << "ERROR: migrate_critter: bodyparts size mismatch source=" << children_old.size()
+					          << " copy=" << children_new.size() << std::endl;
+					std::exit(1);
+				}
 				auto old_child = children_old.begin();
 
-				for_all_children_of3( critter_new->m_bodyparts_shortcut )
+				for_all_children_of3( bodyparts_new )
 				{
+					if ( old_child == children_old.end() )
+					{
+						std::cerr << "ERROR: migrate_critter: source bodyparts iterator exhausted early" << std::endl;
+						std::exit(1);
+					}
 					auto t = (*child3)->get_reference()->getChild( "transform", 1 );
 					auto oldt = (*old_child)->get_reference()->getChild( "transform", 1 );
 					if ( t )

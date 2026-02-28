@@ -23,12 +23,15 @@
 				// bool set( const char* value );
 				virtual bool set( const Bstring& id, BEntity* value );
 
-			private:
-				void updateLifetimeLearning();
-				void ensureLearningShortcuts(CdCritter* critter);
-				void resetLearningState(CdCritter* critter);
-				float readVisionGreenSum(CdCritter* critter);
-				bool mutateBrainSlightly(CdCritter* critter);
+				private:
+					void refreshBodyShortcuts(CdCritter* critter);
+					void updateLifetimeLearning();
+					void updateOscillatorInputs(CdCritter* critter);
+					void ensureLearningShortcuts(CdCritter* critter);
+					void ensureOscillatorShortcuts(CdCritter* critter);
+					void resetLearningState(CdCritter* critter);
+					float readVisionGreenSum(CdCritter* critter);
+					bool mutateBrainSlightly(CdCritter* critter);
 
 				BMousePicker* m_mouse_picker;
 				BEntity* m_unit_container;
@@ -61,10 +64,12 @@
 				BEntity* m_learning_episode_ticks;
 				BEntity* m_learning_reward_energy_weight;
 				BEntity* m_learning_reward_green_weight;
-				BEntity* m_learning_reward_tick_cost;
-				BEntity* m_learning_explore_mutation_chance;
-				BEntity* m_stats_learning_avg_episode_reward;
-				BEntity* m_stats_learning_mutations_total;
+					BEntity* m_learning_reward_tick_cost;
+					BEntity* m_learning_explore_mutation_chance;
+					BEntity* m_stats_learning_avg_episode_reward;
+					BEntity* m_stats_learning_mutations_total;
+					BEntity* m_oscillator_frequency_default;
+					BEntity* m_oscillator_frequency_mutation_delta;
 				
 				CdSpeciesSystem* m_species_system;
 				BEntity* m_body_system_unit_container;
@@ -75,13 +80,14 @@
 		class CdCritter : public BEntity
 		{
 			public:
-				CdCritter()
-					: m_brain(0), m_brain_inputs(0), m_brain_vision_input_start(0), m_brain_vision_input_start_index(0),
-					  m_learning_initialized(false), m_learning_episode_tick(0), m_learning_episode_reward(0.0f),
-					  m_learning_best_episode_reward(0.0f), m_learning_previous_energy(0.0f), m_learning_previous_green(0.0f),
-					  m_learning_episode_tick_entity(0), m_learning_episode_reward_entity(0),
+					CdCritter()
+						: m_brain(0), m_brain_inputs(0), m_brain_vision_input_start(0), m_brain_vision_input_start_index(0),
+						  m_osc_input_sin(0), m_osc_input_cos(0), m_osc_frequency_entity(0), m_osc_phase_entity(0), m_osc_phase(0.0f),
+						  m_learning_initialized(false), m_learning_episode_tick(0), m_learning_episode_reward(0.0f),
+						  m_learning_best_episode_reward(0.0f), m_learning_previous_energy(0.0f), m_learning_previous_green(0.0f),
+						  m_learning_episode_tick_entity(0), m_learning_episode_reward_entity(0),
 					  m_learning_best_episode_reward_entity(0), m_learning_last_reward_entity(0), m_learning_last_green_entity(0),
-					  m_transform_shortcut(0), m_physics_component_shortcut(0), m_bodyparts_shortcut(0),
+					  m_body_root_shortcut(0), m_constraints_shortcut(0), m_transform_shortcut(0), m_physics_component_shortcut(0), m_bodyparts_shortcut(0),
 					  m_age(0), m_energy(0), m_species(0)
 				{
 				};
@@ -95,10 +101,15 @@
 				void setEnergy( Bfloat energy ) { m_energy->set( energy ); }
 				void setSpecies( BEntity* species ) { m_species->set( species ); }
 				BEntity* m_brain;
-				BEntity* m_brain_inputs;
-				BEntity* m_brain_vision_input_start;
-				unsigned int m_brain_vision_input_start_index;
-				bool m_learning_initialized;
+					BEntity* m_brain_inputs;
+					BEntity* m_brain_vision_input_start;
+					unsigned int m_brain_vision_input_start_index;
+					BEntity* m_osc_input_sin;
+					BEntity* m_osc_input_cos;
+					BEntity* m_osc_frequency_entity;
+					BEntity* m_osc_phase_entity;
+					float m_osc_phase;
+					bool m_learning_initialized;
 				unsigned int m_learning_episode_tick;
 				float m_learning_episode_reward;
 				float m_learning_best_episode_reward;
@@ -111,6 +122,8 @@
 				BEntity* m_learning_last_green_entity;
 
 				// performance shortcuts
+				BEntity* m_body_root_shortcut;
+				BEntity* m_constraints_shortcut;
 				BEntity* m_transform_shortcut;
 				BEntity* m_physics_component_shortcut;
 				BEntity* m_bodyparts_shortcut;

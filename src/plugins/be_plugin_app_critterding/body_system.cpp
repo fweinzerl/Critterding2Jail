@@ -1,6 +1,300 @@
 #include "body_system.h"
 #include "kernel/be_entity_core_types.h"
+#include <cctype>
+#include <cstdlib>
+#include <fstream>
+#include <iterator>
+#include <locale>
+#include <sstream>
+#include <string>
+#include <vector>
 #include <iostream>
+
+namespace
+{
+	struct BodyPlanPart
+	{
+		std::string name;
+		float offset_x;
+		float offset_y;
+		float offset_z;
+		float scale_x;
+		float scale_y;
+		float scale_z;
+	};
+
+	struct BodyPlanHinge
+	{
+		std::string name;
+		unsigned int part_a;
+		unsigned int part_b;
+		float local_a_x;
+		float local_a_y;
+		float local_a_z;
+		float local_a_pitch;
+		float local_b_x;
+		float local_b_y;
+		float local_b_z;
+		float local_b_pitch;
+		float limit_low;
+		float limit_high;
+		float softness;
+		float biasfactor;
+		float relaxationfactor;
+		bool bidirectional;
+	};
+
+	struct BodyPlanConfig
+	{
+		std::string physics_bodypart_class;
+		std::string graphics_model_name;
+		std::string graphics_mesh_file;
+		bool bodypart_use_density;
+		float bodypart_density;
+		float bodypart_friction;
+		float bodypart_restitution;
+		bool bodypart_wants_deactivation;
+		std::vector<BodyPlanPart> parts;
+		std::vector<BodyPlanHinge> hinges;
+	};
+
+	BodyPlanConfig g_verified_body_plan;
+
+	bool read_file_text( const std::string& path, std::string& out_text )
+	{
+		std::ifstream file(path.c_str(), std::ios::in);
+		if ( !file.is_open() )
+		{
+			return false;
+		}
+		out_text.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+		return true;
+	}
+
+	bool load_body_plan_file_text( const std::string& path, std::string& out_text )
+	{
+		if ( read_file_text(path, out_text) )
+		{
+			return true;
+		}
+		if ( read_file_text(std::string("../") + path, out_text) )
+		{
+			return true;
+		}
+		if ( read_file_text(std::string("../../") + path, out_text) )
+		{
+			return true;
+		}
+		return false;
+	}
+
+	bool json_find_field_value( const std::string& text, const std::string& key, std::string& out_value )
+	{
+		std::string pattern("\"");
+		pattern += key;
+		pattern += "\"";
+		const auto key_pos = text.find(pattern);
+		if ( key_pos == std::string::npos )
+		{
+			return false;
+		}
+		const auto colon_pos = text.find(':', key_pos + pattern.size());
+		if ( colon_pos == std::string::npos )
+		{
+			return false;
+		}
+		auto value_start = colon_pos + 1;
+		while ( value_start < text.size() && std::isspace(static_cast<unsigned char>(text[value_start])) )
+		{
+			++value_start;
+		}
+		if ( value_start >= text.size() )
+		{
+			return false;
+		}
+
+		auto value_end = value_start;
+		if ( text[value_start] == '"' )
+		{
+			++value_end;
+			while ( value_end < text.size() && text[value_end] != '"' )
+			{
+				++value_end;
+			}
+			if ( value_end < text.size() )
+			{
+				++value_end;
+			}
+		}
+		else
+		{
+			while ( value_end < text.size() )
+			{
+				const auto c = text[value_end];
+				if ( c == ',' || c == '}' || c == '\n' || c == '\r' )
+				{
+					break;
+				}
+				++value_end;
+			}
+		}
+		out_value = text.substr(value_start, value_end - value_start);
+		return true;
+	}
+
+	bool json_get_required_number( const std::string& text, const std::string& key, float& target )
+	{
+		std::string raw;
+		if ( !json_find_field_value(text, key, raw) )
+		{
+			return false;
+		}
+		std::istringstream stream(raw);
+		stream.imbue(std::locale::classic());
+		stream >> target;
+		if ( stream.fail() )
+		{
+			return false;
+		}
+		stream >> std::ws;
+		return stream.eof();
+	}
+
+	bool json_get_required_uint( const std::string& text, const std::string& key, unsigned int& target )
+	{
+		float number(0.0f);
+		if ( !json_get_required_number(text, key, number) )
+		{
+			return false;
+		}
+		if ( number < 0.0f )
+		{
+			return false;
+		}
+		target = static_cast<unsigned int>(number);
+		return true;
+	}
+
+	bool json_get_required_string( const std::string& text, const std::string& key, std::string& target )
+	{
+		std::string raw;
+		if ( !json_find_field_value(text, key, raw) )
+		{
+			return false;
+		}
+		if ( raw.size() < 2 || raw.front() != '"' || raw.back() != '"' )
+		{
+			return false;
+		}
+		target = raw.substr(1, raw.size() - 2);
+		return true;
+	}
+
+	bool json_get_required_bool( const std::string& text, const std::string& key, bool& target )
+	{
+		std::string raw;
+		if ( !json_find_field_value(text, key, raw) )
+		{
+			return false;
+		}
+		if ( raw.find("true") != std::string::npos )
+		{
+			target = true;
+			return true;
+		}
+		if ( raw.find("false") != std::string::npos )
+		{
+			target = false;
+			return true;
+		}
+		return false;
+	}
+
+	void fatal_body_plan_error( const std::string& message )
+	{
+		std::cerr << "ERROR: body plan config: " << message << std::endl;
+		std::exit(1);
+	}
+
+	bool load_body_plan_config( const std::string& path, BodyPlanConfig& cfg )
+	{
+		std::string text;
+		if ( !load_body_plan_file_text(path, text) )
+		{
+			return false;
+		}
+
+		unsigned int part_count(0);
+		unsigned int hinge_count(0);
+		if ( !json_get_required_string(text, "physics_bodypart_class", cfg.physics_bodypart_class) ) return false;
+		if ( !json_get_required_string(text, "graphics_model_name", cfg.graphics_model_name) ) return false;
+		if ( !json_get_required_string(text, "graphics_mesh_file", cfg.graphics_mesh_file) ) return false;
+		if ( !json_get_required_bool(text, "bodypart_use_density", cfg.bodypart_use_density) ) return false;
+		if ( !json_get_required_number(text, "bodypart_density", cfg.bodypart_density) ) return false;
+		if ( !json_get_required_number(text, "bodypart_friction", cfg.bodypart_friction) ) return false;
+		if ( !json_get_required_number(text, "bodypart_restitution", cfg.bodypart_restitution) ) return false;
+		if ( !json_get_required_bool(text, "bodypart_wants_deactivation", cfg.bodypart_wants_deactivation) ) return false;
+		if ( !json_get_required_uint(text, "part_count", part_count) ) return false;
+		if ( !json_get_required_uint(text, "hinge_count", hinge_count) ) return false;
+		if ( part_count == 0 ) return false;
+
+		cfg.parts.clear();
+		cfg.hinges.clear();
+		cfg.parts.reserve(part_count);
+		cfg.hinges.reserve(hinge_count);
+
+		for ( unsigned int i = 0; i < part_count; ++i )
+		{
+			BodyPlanPart part;
+			const auto id = std::to_string(i);
+			if ( !json_get_required_string(text, "part_" + id + "_name", part.name) ) return false;
+			if ( !json_get_required_number(text, "part_" + id + "_offset_x", part.offset_x) ) return false;
+			if ( !json_get_required_number(text, "part_" + id + "_offset_y", part.offset_y) ) return false;
+			if ( !json_get_required_number(text, "part_" + id + "_offset_z", part.offset_z) ) return false;
+			if ( !json_get_required_number(text, "part_" + id + "_scale_x", part.scale_x) ) return false;
+			if ( !json_get_required_number(text, "part_" + id + "_scale_y", part.scale_y) ) return false;
+			if ( !json_get_required_number(text, "part_" + id + "_scale_z", part.scale_z) ) return false;
+			cfg.parts.push_back(part);
+		}
+
+		for ( unsigned int i = 0; i < hinge_count; ++i )
+		{
+			BodyPlanHinge hinge;
+			const auto id = std::to_string(i);
+			if ( !json_get_required_string(text, "hinge_" + id + "_name", hinge.name) ) return false;
+			if ( !json_get_required_uint(text, "hinge_" + id + "_part_a", hinge.part_a) ) return false;
+			if ( !json_get_required_uint(text, "hinge_" + id + "_part_b", hinge.part_b) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_local_a_x", hinge.local_a_x) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_local_a_y", hinge.local_a_y) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_local_a_z", hinge.local_a_z) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_local_a_pitch", hinge.local_a_pitch) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_local_b_x", hinge.local_b_x) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_local_b_y", hinge.local_b_y) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_local_b_z", hinge.local_b_z) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_local_b_pitch", hinge.local_b_pitch) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_limit_low", hinge.limit_low) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_limit_high", hinge.limit_high) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_softness", hinge.softness) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_biasfactor", hinge.biasfactor) ) return false;
+			if ( !json_get_required_number(text, "hinge_" + id + "_relaxationfactor", hinge.relaxationfactor) ) return false;
+			if ( !json_get_required_bool(text, "hinge_" + id + "_bidirectional", hinge.bidirectional) ) return false;
+			if ( hinge.part_a >= part_count || hinge.part_b >= part_count ) return false;
+			cfg.hinges.push_back(hinge);
+		}
+
+		return true;
+	}
+
+	void verify_and_cache_body_plan_or_die( const std::string& path )
+	{
+		BodyPlanConfig cfg;
+		if ( !load_body_plan_config(path, cfg) )
+		{
+			fatal_body_plan_error(std::string("verifier failed for required file '") + path + "'");
+		}
+		g_verified_body_plan = cfg;
+	}
+}
  
 	void BodySystem::construct()
 	{
@@ -30,6 +324,7 @@
 		m_bodypart_friction = settings->addChild( "bodypart_friction", new BEntity_float() );
 		m_bodypart_restitution = settings->addChild( "bodypart_restitution", new BEntity_float() );
 		m_bodypart_density = settings->addChild( "bodypart_density", new BEntity_float() );
+		m_body_plan_file = settings->addChild( "body_plan_file", new BEntity_string() );
 		settings->addChild( "bodypart_use_density", new BEntity_bool() )->set( false );
 
 		// auto mutation_weights = settings->addChild( "mutation_weights", new BEntity() );
@@ -68,6 +363,12 @@
 		m_bodypart_friction->set( 0.95f );
 		m_bodypart_restitution->set( 0.95f );
 		m_bodypart_density->set( 100.0f );
+		m_body_plan_file->set( "config/body_plan.default.json" );
+		verify_and_cache_body_plan_or_die( m_body_plan_file->get_string() );
+		m_bodypart_friction->set( g_verified_body_plan.bodypart_friction );
+		m_bodypart_restitution->set( g_verified_body_plan.bodypart_restitution );
+		m_bodypart_density->set( g_verified_body_plan.bodypart_density );
+		settings->getChild( "bodypart_use_density", 1 )->set( g_verified_body_plan.bodypart_use_density );
 
 		// m_mutationweight_bodypart_add->set( Buint(5) );
 		// m_mutationweight_bodypart_remove->set( Buint(6) );
@@ -86,9 +387,8 @@
 // 				t_body_eye_rays_max _maxentityType_UINT
 	}
 
-	void BodyFixed1Maker::make( BEntity* entity_parent )
+	void CdBodyPlanBuilder::make( BEntity* entity_parent )
 	{
-		auto body_system = entity_parent->parent()->parent()->parent();
 		auto critter_system = entity_parent->parent()->parent()->parent()->parent();
 		entity_parent->addChild( "bodyparts", new BEntity() );
 		auto t_constraints = entity_parent->addChild( "constraints", new BEntity() );
@@ -106,153 +406,82 @@
 
 		auto physics_world = critter_system->parent()->getChild( "physicsworld", 1 );
 		auto settings = entity_parent->parent()->parent()->parent()->getChild( "settings", 1 );
-		auto bodypart_spacing = settings->getChild( "bodypart_spacing", 1 )->get_float();
+		const auto& plan = g_verified_body_plan;
 		auto dropzone = critter_system->getChild( "settings", 1 )->getChild( "dropzone", 1 );
 
-		// CENTRAL BODYPART  
+		// SPAWN BASE POSITION
 			m_rng->set( "min", (Bint)0 );
 			m_rng->set( "max", (Bint)dropzone->getChild( "size_x", 1 )->get_float() );
-			auto central_bodypart_position_x = dropzone->getChild( "position_x", 1 )->get_float() + m_rng->get_int();
+			const auto spawn_base_x = dropzone->getChild( "position_x", 1 )->get_float() + m_rng->get_int();
 
 			m_rng->set( "max", (Bint)dropzone->getChild( "size_y", 1 )->get_float() );
-			auto central_bodypart_position_y = dropzone->getChild( "position_y", 1 )->get_float() + m_rng->get_int();
+			const auto spawn_base_y = dropzone->getChild( "position_y", 1 )->get_float() + m_rng->get_int();
 
 			m_rng->set( "max", (Bint)dropzone->getChild( "size_z", 1 )->get_float() );
-			auto central_bodypart_position_z = dropzone->getChild( "position_z", 1 )->get_float() + m_rng->get_int();
+			const auto spawn_base_z = dropzone->getChild( "position_z", 1 )->get_float() + m_rng->get_int();
 
-		// SCALES 
-			auto central_bodypart_scale_x = 0.4f;
-			auto central_bodypart_scale_y = 0.2f;
-			auto central_bodypart_scale_z = 0.4f;
+		std::vector<BEntity*> built_parts;
+		built_parts.reserve(plan.parts.size());
 
-			// EXTRA BODYPARTS
-			auto joint_bodypart_scale_x = 0.1f;
-			auto joint_bodypart_scale_y = 0.2f;
-			auto joint_bodypart_scale_z = 0.2f;
-
-			auto leg_bodypart_scale_x = 0.4f;
-			auto leg_bodypart_scale_y = 0.2f;
-			auto leg_bodypart_scale_z = 0.2f;
-			
-		// auto central_bodypart1 = tergite(
-		// 	central_bodypart_position_x, central_bodypart_position_y, central_bodypart_position_z, central_bodypart_scale_x, central_bodypart_scale_y, central_bodypart_scale_z,
-		// 	leg_bodypart_scale_x, leg_bodypart_scale_y, leg_bodypart_scale_z );
-
-		auto central_bodypart1 = tergite2( entity_parent, 
-			central_bodypart_position_x, central_bodypart_position_y, central_bodypart_position_z, central_bodypart_scale_x, central_bodypart_scale_y, central_bodypart_scale_z,
-			joint_bodypart_scale_x, joint_bodypart_scale_y, joint_bodypart_scale_z,
-			leg_bodypart_scale_x, leg_bodypart_scale_y, leg_bodypart_scale_z );
-		
-		central_bodypart_position_z = central_bodypart_position_z - central_bodypart_scale_x - bodypart_spacing;
-		central_bodypart_scale_x = 0.7f;
-		central_bodypart_scale_z = 0.7f;
-
-		auto central_bodypart2 = tergite2( entity_parent, 
-			central_bodypart_position_x, central_bodypart_position_y, central_bodypart_position_z, central_bodypart_scale_x, central_bodypart_scale_y, central_bodypart_scale_z,
-			joint_bodypart_scale_x, joint_bodypart_scale_y, joint_bodypart_scale_z,
-			leg_bodypart_scale_x, leg_bodypart_scale_y, leg_bodypart_scale_z );
-
-		// CONNECT 2 CENTRAL BODYPARTS
+		for ( const auto& part : plan.parts )
 		{
-			// a hinge
-			auto hinge_entity = physics_world->addChild( "hinge", "Constraint_Hinge" );
+			auto bodypart = constructBodypart(
+				entity_parent,
+				part.name.c_str(),
+				physics_world,
+				spawn_base_x + part.offset_x,
+				spawn_base_y + part.offset_y,
+				spawn_base_z + part.offset_z,
+				part.scale_x,
+				part.scale_y,
+				part.scale_z
+			);
+			built_parts.push_back(bodypart);
 
-			// set A bodypart
+			bodypart->set("friction", plan.bodypart_friction);
+			bodypart->set("restitution", plan.bodypart_restitution);
+		}
+
+		for ( const auto& hinge : plan.hinges )
+		{
+			auto hinge_entity = physics_world->addChild( hinge.name.c_str(), "Constraint_Hinge" );
 			auto bodyA_ref = hinge_entity->addChild( "bodyA", new BEntity_reference() );
-			bodyA_ref->set( central_bodypart1 );
-
-			// set B bodypart
 			auto bodyB_ref = hinge_entity->addChild( "bodyB", new BEntity_reference() );
-			bodyB_ref->set( central_bodypart2 );
+			bodyA_ref->set( built_parts[hinge.part_a] );
+			bodyB_ref->set( built_parts[hinge.part_b] );
 
-			// get A & B  transforms from hinge
 			auto t_a = hinge_entity->getChild( "localA", 1 );
 			auto t_b = hinge_entity->getChild( "localB", 1 );
+			t_a->set( "position_x", hinge.local_a_x );
+			t_a->set( "position_y", hinge.local_a_y );
+			t_a->set( "position_z", hinge.local_a_z );
+			t_a->set( "pitch", hinge.local_a_pitch );
+			t_b->set( "position_x", hinge.local_b_x );
+			t_b->set( "position_y", hinge.local_b_y );
+			t_b->set( "position_z", hinge.local_b_z );
+			t_b->set( "pitch", hinge.local_b_pitch );
 
-			// hinge position
-			t_a->set( "position_z", -central_bodypart1->get_float( "scale_x") / 2 - bodypart_spacing / 2 );
-			t_b->set( "position_z", +central_bodypart2->get_float( "scale_x" ) / 2 + bodypart_spacing / 2 );
-			t_a->set( "pitch", 1.57f );
-			t_b->set( "pitch", 1.57f );
-			
-			// hinge properties
-			hinge_entity->getChild( "limit_low", 1 )->set( -0.5f );
-			hinge_entity->getChild( "limit_high", 1 )->set( 0.5f );
-			hinge_entity->getChild( "softness", 1 )->set( 0.999f );
-			hinge_entity->getChild( "biasfactor", 1 )->set( 0.999f );
-			hinge_entity->getChild( "relaxationfactor", 1 )->set( 0.5f );
-			hinge_entity->getChild( "bidirectional", 1 )->set( true );
-			
-
-			// pull create trigger
+			hinge_entity->getChild( "limit_low", 1 )->set( hinge.limit_low );
+			hinge_entity->getChild( "limit_high", 1 )->set( hinge.limit_high );
+			hinge_entity->getChild( "softness", 1 )->set( hinge.softness );
+			hinge_entity->getChild( "biasfactor", 1 )->set( hinge.biasfactor );
+			hinge_entity->getChild( "relaxationfactor", 1 )->set( hinge.relaxationfactor );
+			hinge_entity->getChild( "bidirectional", 1 )->set( hinge.bidirectional );
 			hinge_entity->set( "create_hinge", true );
-			
-			// REFERENCE TO EXTERNAL CHILD
-			// FIXME needs to be in seperate "constraints" parent entity
-				t_constraints->addChild( "external_hinge", new BEntity_external() )->set( hinge_entity );
+
+			t_constraints->addChild( "external_hinge", new BEntity_external() )->set( hinge_entity );
 		}
-
-		// 3RD TERGITE
-		bool three_bodyparts = false;
-		if ( three_bodyparts )
-		{
-			auto central_bodypart3 = tergite2( entity_parent, 
-				central_bodypart_position_x, central_bodypart_position_y, central_bodypart_position_z, central_bodypart_scale_x, central_bodypart_scale_y, central_bodypart_scale_z,
-				joint_bodypart_scale_x, joint_bodypart_scale_y, joint_bodypart_scale_z,
-				leg_bodypart_scale_x, leg_bodypart_scale_y, leg_bodypart_scale_z );
-		
-			// CONNECT 2 OTHER CENTRAL BODYPARTS
-			{
-				// a hinge
-				auto hinge_entity = physics_world->addChild( "hinge", "Constraint_Hinge" );
-
-				// set A bodypart
-				auto bodyA_ref = hinge_entity->addChild( "bodyA", new BEntity_reference() );
-				bodyA_ref->set( central_bodypart2 );
-
-				// set B bodypart
-				auto bodyB_ref = hinge_entity->addChild( "bodyB", new BEntity_reference() );
-				bodyB_ref->set( central_bodypart3 );
-
-				// get A & B  transforms from hinge
-				auto t_a = hinge_entity->getChild( "localA", 1 );
-				auto t_b = hinge_entity->getChild( "localB", 1 );
-
-				// hinge position
-				t_a->set( "position_z", -central_bodypart3->get_float( "scale_x") / 2 - bodypart_spacing / 2 );
-				t_b->set( "position_z", +central_bodypart3->get_float( "scale_x" ) / 2 + bodypart_spacing / 2 );
-				t_a->set( "pitch", 1.57f );
-				t_b->set( "pitch", 1.57f );
-				
-				// hinge properties
-				hinge_entity->getChild( "limit_low", 1 )->set( -0.5f );
-				hinge_entity->getChild( "limit_high", 1 )->set( 0.5f );
-				hinge_entity->getChild( "softness", 1 )->set( 0.999f );
-				hinge_entity->getChild( "biasfactor", 1 )->set( 0.999f );
-				hinge_entity->getChild( "relaxationfactor", 1 )->set( 0.5f );
-				hinge_entity->getChild( "bidirectional", 1 )->set( true );
-				
-
-				// pull create trigger
-				hinge_entity->set( "create_hinge", true );
-				
-				// REFERENCE TO EXTERNAL CHILD
-				// FIXME needs to be in seperate "constraints" parent entity
-					t_constraints->addChild( "external_hinge", new BEntity_external() )->set( hinge_entity );
-			}
-		}
-		
 	}
 	
-	void BodyFixed1::construct()
+	void CdBodyPlan::construct()
 	{
-		BodyFixed1Maker m;
+		CdBodyPlanBuilder m;
 		m.make( this );
 	}
 
-	BEntity* BodyFixed1::customCopy( BEntity* to_parent, BEntity* entity, std::map<BEntity*, BEntity*>& translation_map )
+	BEntity* CdBodyPlan::customCopy( BEntity* to_parent, BEntity* entity, std::map<BEntity*, BEntity*>& translation_map )
 	{
-		auto entity_new = to_parent->addChild( entity->name(), new BodyFixed1() );
+		auto entity_new = to_parent->addChild( entity->name(), new CdBodyPlan() );
 		
 		// HACK SPECIAL CASE
 		// LOOP ENTITY & ENTITY_NEW TO ADD THEM TO THE TRANSLATION_MAP
@@ -301,7 +530,7 @@
 	}
 	
 	
-	BEntity* BodyFixed1Maker::tergite2( BEntity* body, float central_bodypart_position_x, float central_bodypart_position_y, float central_bodypart_position_z, float central_bodypart_scale_x, float central_bodypart_scale_y, float central_bodypart_scale_z, float joint_bodypart_scale_x, float joint_bodypart_scale_y, float joint_bodypart_scale_z, float leg_bodypart_scale_x, float leg_bodypart_scale_y, float leg_bodypart_scale_z )
+	BEntity* CdBodyPlanBuilder::tergite2( BEntity* body, float central_bodypart_position_x, float central_bodypart_position_y, float central_bodypart_position_z, float central_bodypart_scale_x, float central_bodypart_scale_y, float central_bodypart_scale_z, float joint_bodypart_scale_x, float joint_bodypart_scale_y, float joint_bodypart_scale_z, float leg_bodypart_scale_x, float leg_bodypart_scale_y, float leg_bodypart_scale_z )
 	{
 		auto t_constraints = body->getChild( "constraints", 1 );
 
@@ -496,7 +725,7 @@
 		return 0;
 	}
 	
-	BEntity* BodyFixed1Maker::tergite_simple(
+	BEntity* CdBodyPlanBuilder::tergite_simple(
 		BEntity* body,
 		float central_bodypart_position_x,
 		float central_bodypart_position_y,
@@ -605,25 +834,23 @@
 		return 0;
 	}
 
-	BEntity* BodyFixed1Maker::constructBodypart( BEntity* body, const char* name, BEntity* physics_world, float pos_x, float pos_y, float pos_z, float scale_x, float scale_y, float scale_z )
+	BEntity* CdBodyPlanBuilder::constructBodypart( BEntity* body, const char* name, BEntity* physics_world, float pos_x, float pos_y, float pos_z, float scale_x, float scale_y, float scale_z )
 	{
 		auto t_bodyparts = body->getChild( "bodyparts", 1 );
 		
 		// PHYSICS
-			auto new_bodypart = physics_world->addChild( name, "PhysicsEntity_Cube" );
-
-			auto settings = body->parent()->parent()->parent()->getChild( "settings", 1 );
+			auto new_bodypart = physics_world->addChild( name, g_verified_body_plan.physics_bodypart_class.c_str() );
 			
 			// WEIGHT
 				float weight(1.0f);
-				if ( settings->getChild( "bodypart_use_density", 1 )->get_bool() )
+				if ( g_verified_body_plan.bodypart_use_density )
 				{
-					weight = settings->getChild( "bodypart_density", 1 )->get_float() * (scale_x * scale_y * scale_z);
+					weight = g_verified_body_plan.bodypart_density * (scale_x * scale_y * scale_z);
 				}
 				new_bodypart->addChild( "weight", new BEntity_float_property() )->set( weight ); // FIXME SETTING
 			
 			// DEACTIVATION
-				new_bodypart->addChild( "wants_deactivation", new BEntity_bool_property() )->set( false ); // FIXME SETTING
+				new_bodypart->addChild( "wants_deactivation", new BEntity_bool_property() )->set( g_verified_body_plan.bodypart_wants_deactivation ); // FIXME SETTING
 
 			// SCALE
 				new_bodypart->addChild( "scale_x", new BEntity_float_property() )->set( scale_x ); // FIXME SETTING
@@ -648,13 +875,12 @@
 			{
 				// FIXME do the graphics entity upstairs in body_system, we're assuming we need a graphics entity for all anyway
 				// LOAD MODEL IF NEEDED, ADD TRANSFORM
-				auto graphics_entity_critter = graphicsmodelsystem->getChild( "graphics_entity_critter", 1 );
+				auto graphics_entity_critter = graphicsmodelsystem->getChild( g_verified_body_plan.graphics_model_name.c_str(), 1 );
 				if ( !graphics_entity_critter )
 				{
-					graphics_entity_critter = graphicsmodelsystem->addChild("graphics_entity_critter", "GraphicsModel");
+					graphics_entity_critter = graphicsmodelsystem->addChild(g_verified_body_plan.graphics_model_name.c_str(), "GraphicsModel");
 					graphics_transform = graphics_entity_critter->addChild("transform", "Transform");
-					// graphics_entity_critter->set("filename", "../share/modules/cube-critter.obj");
-					graphics_entity_critter->set("filename", "../share/modules/cube-critter-t.obj");
+					graphics_entity_critter->set("filename", g_verified_body_plan.graphics_mesh_file.c_str());
 					// graphics_entity_critter->set("filename", "/projects/bengine-new/share/sandbox/modules/cube-critter.obj");
 					
 					
@@ -681,4 +907,3 @@
 
 			return new_bodypart;
 	}
-

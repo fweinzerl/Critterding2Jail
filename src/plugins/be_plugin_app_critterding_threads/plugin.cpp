@@ -5,11 +5,14 @@
 #include "plugins/be_plugin_app_critterding/critter_system.h"
 #include "plugins/be_plugin_app_critterding/commands.h"
 #include "plugins/be_plugin_app_critterding/keybind_config.h"
+#include "plugins/be_plugin_app_critterding/body_runtime_access.h"
 #include "critter_thread_mesher.h"
 // #include "plugins/be_plugin_bullet/be_entity_physics_entity.h"
 // #include "plugins/be_plugin_bullet/be_entity_transform.h" // FIXME work this away
 // #include <iostream>
 #include <sstream>
+#include <cstdlib>
+#include <iostream>
 
 	void Server::construct()
 	{
@@ -779,41 +782,48 @@
 			m_camera_sensitivity_move->set(m_camera_move_base_sensitivity * turbo_factor);
 		}
 
-// 		// std::cout << "a" << std::endl;
-// 		// CAST RAY FROM MOUSE
-// 			auto camera_position = m_camera->m_transform->m_transform.getOrigin();
-// 
-// 			m_raycast_source_x1->set( camera_position.x() );
-// 			m_raycast_source_y1->set( camera_position.y() );
-// 			m_raycast_source_z1->set( camera_position.z() );
-// 			m_raycast_source_x2->set( camera_position.x() );
-// 			m_raycast_source_y2->set( camera_position.y() );
-// 			m_raycast_source_z2->set( camera_position.z() );
-// 			m_raycast_source_x3->set( camera_position.x() );
-// 			m_raycast_source_y3->set( camera_position.y() );
-// 			m_raycast_source_z3->set( camera_position.z() );
-// 			m_raycast_source_x4->set( camera_position.x() );
-// 			m_raycast_source_y4->set( camera_position.y() );
-// 			m_raycast_source_z4->set( camera_position.z() );
-// 
-// 			btVector3 rayDirection = m_camera->getScreenDirection( m_win_width->get_int(), m_win_height->get_int(), m_mouse_x->get_int(), m_mouse_y->get_int() );
-// 			m_raycast_target_x1->set( rayDirection.x() );
-// 			m_raycast_target_y1->set( rayDirection.y() );
-// 			m_raycast_target_z1->set( rayDirection.z() );
-// 			m_raycast_target_x2->set( rayDirection.x() );
-// 			m_raycast_target_y2->set( rayDirection.y() );
-// 			m_raycast_target_z2->set( rayDirection.z() );
-// 			m_raycast_target_x3->set( rayDirection.x() );
-// 			m_raycast_target_y3->set( rayDirection.y() );
-// 			m_raycast_target_z3->set( rayDirection.z() );
-// 			m_raycast_target_x4->set( rayDirection.x() );
-// 			m_raycast_target_y4->set( rayDirection.y() );
-// 			m_raycast_target_z4->set( rayDirection.z() );
-// 			
-// 			m_bullet_raycast1->process();
-// 			m_bullet_raycast2->process();
-// 			m_bullet_raycast3->process();
-// 			m_bullet_raycast4->process();
+		// CAST RAY FROM MOUSE FOR ALL THREAD RAYCASTERS
+		auto raycasters = getChild( "raycasters", 1 );
+		if ( raycasters == 0 )
+		{
+			std::cerr << "ERROR: threaded scene: missing raycasters container" << std::endl;
+			std::exit(1);
+		}
+
+		auto camera_position = m_camera->m_transform->m_transform.getOrigin();
+		btVector3 ray_direction = m_camera->getScreenDirection(
+			m_win_width->get_int(),
+			m_win_height->get_int(),
+			m_mouse_x->get_int(),
+			m_mouse_y->get_int()
+		);
+
+		for_all_children_of( raycasters )
+		{
+			auto raycaster = (*child)->get_reference();
+			if ( raycaster == 0 )
+			{
+				std::cerr << "ERROR: threaded scene: missing raycaster reference" << std::endl;
+				std::exit(1);
+			}
+
+			auto source = raycaster->getChild( "source", 1 );
+			auto target = raycaster->getChild( "target", 1 );
+			if ( source == 0 || target == 0 )
+			{
+				std::cerr << "ERROR: threaded scene: raycaster missing source/target" << std::endl;
+				std::exit(1);
+			}
+
+			source->getChild( "x", 1 )->set( camera_position.x() );
+			source->getChild( "y", 1 )->set( camera_position.y() );
+			source->getChild( "z", 1 )->set( camera_position.z() );
+			target->getChild( "x", 1 )->set( ray_direction.x() );
+			target->getChild( "y", 1 )->set( ray_direction.y() );
+			target->getChild( "z", 1 )->set( ray_direction.z() );
+
+			raycaster->process();
+		}
 	}
 
 	BEntity* Server::findCritter( BEntity* e1, BEntity* e2 )
@@ -824,10 +834,15 @@
 			auto critter = dynamic_cast<CdCritter*>( *child2 );
 			if ( critter )
 			{
-				if ( critter->m_bodyparts_shortcut == 0 )
-				{
-					critter->m_bodyparts_shortcut = critter->getChild( "external_body", 1 )->get_reference()->getChild( "body_fixed1", 1 )->getChild( "bodyparts", 1 );
-				}
+					if ( critter->m_bodyparts_shortcut == 0 )
+					{
+						critter->m_bodyparts_shortcut = cd_body_runtime::find_bodyparts_from_critter( critter );
+						if ( critter->m_bodyparts_shortcut == 0 )
+						{
+							std::cerr << "ERROR: server::findCritter: missing required bodyparts shortcut" << std::endl;
+							std::exit(1);
+						}
+					}
 
 				for_all_children_of3( critter->m_bodyparts_shortcut )
 				{

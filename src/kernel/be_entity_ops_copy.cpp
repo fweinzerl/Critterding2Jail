@@ -749,9 +749,10 @@
 						{
 							return;
 						}
-						else if ( e_name == "body_fixed1" )
+						else if ( e_name == "body_fixed1" || e_name == "body" || e_type == "BodyFixed1" || e_type == "CdBodyPlan" )
 						{
-							this_entity = parent->addChild( "body_fixed1", "BodyFixed1" );
+							const char* body_name = e_name.empty() ? "body" : e_name.c_str();
+							this_entity = parent->addChild( body_name, "CdBodyPlan" );
 
 							// this_entity = parent->addChild( e_name.c_str(), "BodyFixed1" );
 							// this_entity = parent->getChildCustom( parent, "generate_fixed_1" );
@@ -1097,7 +1098,7 @@
 							BEntity* this_entity(translation_map[(unsigned int)e_id]);
 							BEntity* e_target(translation_map[(unsigned int)e_conn_id]);
 							
-							// SHOULD BE OK BECAUSE MISSING CONNECTIONS ARE TAKEN CARE OF WHEN CREATING body_fixed1
+							// SHOULD BE OK BECAUSE MISSING CONNECTIONS ARE TAKEN CARE OF WHEN CREATING BodyFixed1
 							if ( this_entity && e_target )
 							{
 								this_entity->connectServerServer(e_target);

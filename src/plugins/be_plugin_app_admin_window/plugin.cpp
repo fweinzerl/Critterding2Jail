@@ -140,7 +140,6 @@
 				auto entity_groupbox = general_layout_H->addChild( "Entity Groupbox", "QGroupBox" );
 				// entity_groupbox->addChild( "title", "string_property" )->set("Entities");
 				auto groupVbox = entity_groupbox->addChild( "QT VBoxlayout", "QVBoxLayout" );
-				entity_groupbox->addChild( "QGroupBox_end", "QGroupBox_end" );
 				
 	// 			auto edit = groupVbox->addChild( "edit test", "QLineEdit" );
 				// ENTITIES
@@ -180,7 +179,6 @@
 			// copy.setClassTranslationMap( &m_imgui_translation_map );
 			// copy.copyEntity( qwindow, topParent()->getChild("bin", 1)->getChild("GLWindow") );
 	
-			qwindow->addChild( "QMainWindow_end", "QMainWindow_end" );
 
 		}
 	}
@@ -409,13 +407,11 @@
 						auto groupVbox = entity_groupbox->addChild( "QT VBoxlayout", "QVBoxLayout" );
 
 						add_admin_entity_groupbox(groupVbox, entity);
-						entity_groupbox->addChild( "QGroupBox_end", "QGroupBox_end" );
 
 						m_lookup_buffer.registerAdminEntity( entity, groupVbox );
 						m_lookup_buffer.registerAdminEntity( entity, qwindow );
 				}
 				
-				qwindow->addChild( "QMainWindow_end", "QMainWindow_end" );
 
 				return true;
 			}
@@ -466,7 +462,6 @@
 
 				m_lookup_buffer.registerAdminEntity( entity, qwindow );
 
-				qwindow->addChild( "QMainWindow_end", "QMainWindow_end" );
 				return true;
 			}
 			
@@ -564,7 +559,6 @@
 		// ENTITY LIST
 			add_admin_entity_list( vboxlayout_entities, entity );
 			
-		groupbox_entities->addChild( "QGroupBox_end", "QGroupBox_end" );
 	}
 	// GROUPBOX OF ENTITIES
 	void BAdminWindow::add_admin_entity_list( BEntity* parent, BEntity* entity )
