@@ -47,6 +47,7 @@
 				BEntity* m_copy_random_position;
 				BEntity* m_stats_births_total;
 				BEntity* m_stats_deaths_total;
+				BEntity* m_stats_energy_total;
 				
 				CdSpeciesSystem* m_species_system;
 				BEntity* m_body_system_unit_container;
@@ -69,6 +70,8 @@
 				void setSpecies( BEntity* species ) { m_species->set( species ); }
 				BEntity* m_brain;
 				BEntity* m_brain_inputs;
+				BEntity* m_brain_vision_input_start;
+				unsigned int m_brain_vision_input_start_index;
 
 				// performance shortcuts
 				BEntity* m_transform_shortcut;

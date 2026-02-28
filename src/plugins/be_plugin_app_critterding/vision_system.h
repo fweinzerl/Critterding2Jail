@@ -3,8 +3,10 @@
 #include "kernel/be_entity_interface.h"
 #include "plugins/be_plugin_bullet/physicsmodel_rigid.h"
 #include <glm/gtc/type_ptr.hpp>
+#include <vector>
 
 	class BGraphicsModelSystem;
+	class BGraphicsModel;
 
 	class CdVisionSystem: public BEntity
 	{
@@ -49,6 +51,8 @@
 			BEntity* m_print;
 			BEntity* m_critter_sightrange;
 			BEntity* m_e_scale_x;
+			BEntity* m_update_every_n_ticks;
+			unsigned int m_tick_counter;
 			
 			float m_buffer[16];
 			btTransform m_ViewMatrix;
@@ -59,5 +63,6 @@
 			unsigned int m_ProjectionViewMatrixID;
 			
 			BGraphicsModelSystem* m_graphics_model_system;
+			std::vector<BGraphicsModel*> m_visible_models_cache;
+			unsigned int m_visible_models_cache_source_count;
 	};
-

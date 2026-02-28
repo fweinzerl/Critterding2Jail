@@ -58,6 +58,7 @@
 		m_command_buffer = getCommandBuffer();
 		
 		m_collisions = 0;
+		m_critter_energy_total = 0;
 	}
 	
 	void CdFoodSystem::process()
@@ -68,12 +69,9 @@
 			float total_energy_in_entities(0.0f);
 			for_all_children_of( m_unit_container )
 			{
-				auto food_unit = dynamic_cast<CdFood*>( *child );
-				if ( food_unit )
-				{
-					food_unit->setAge( 1+food_unit->age() );
-					total_energy_in_entities += food_unit->energy();
-				}
+				auto food_unit = static_cast<CdFood*>( *child );
+				food_unit->setAge( 1+food_unit->age() );
+				total_energy_in_entities += food_unit->energy();
 			}
 
 			if ( m_critter_unit_container == 0 )
@@ -84,21 +82,30 @@
 					m_critter_unit_container = parent()->getChild( "critter_system", 1 )->getChild( "unit_container", 1 );
 				}
 			}
+			if ( m_critter_energy_total == 0 )
+			{
+				auto critter_system = parent()->getChild( "critter_system", 1 );
+				if ( critter_system )
+				{
+					m_critter_energy_total = critter_system->getChild("settings", 1)->getChild("stats", 1)->getChild("energy_total", 1);
+				}
+			}
 
 			if ( ++m_framecount == m_insert_frame_interval->get_uint() || m_insert_frame_interval->get_uint() == 0 )
 			{
 				// std::cout << "yes" << std::endl;
 				m_framecount = 0;
 				// FIXME OPTIMIZE, COUNT UP ENERGY IN CRITTER SYSTEM
-				if ( m_critter_unit_container )
+				if ( m_critter_energy_total )
 				{
+					total_energy_in_entities += m_critter_energy_total->get_float();
+				}
+				else if ( m_critter_unit_container )
+				{
+					// Fallback when critter stats path isn't available.
 					for_all_children_of2( m_critter_unit_container )
 					{
-						auto critter_unit = dynamic_cast<CdCritter*>( *child2 );
-						if ( critter_unit )
-						{
-							total_energy_in_entities += critter_unit->energy();
-						}
+						total_energy_in_entities += static_cast<CdCritter*>( *child2 )->energy();
 					}
 				}
 
@@ -121,17 +128,14 @@
 		// DIE FROM OLD AGE OR ENERGY DEPLETION
 			for_all_children_of2( m_unit_container )
 			{
-				auto food_unit = dynamic_cast<CdFood*>( *child2 );
-				if ( food_unit )
+				auto food_unit = static_cast<CdFood*>( *child2 );
+				// reached max age or energy is depleted
+				if ( food_unit->age() >= m_maximum_age->get_uint() || food_unit->energy() <= 0.0f )
 				{
-					// reached max age or energy is depleted
-					if ( food_unit->age() >= m_maximum_age->get_uint() || food_unit->energy() <= 0.0f )
-					{
-						removeFood( food_unit );
+					removeFood( food_unit );
 
-						// PREVENT FURTHER DELETION OR INSERTION OF FOOD IN THIS FRAME
-							return; 
-					}
+					// PREVENT FURTHER DELETION OR INSERTION OF FOOD IN THIS FRAME
+						return; 
 				}
 			}
 	}

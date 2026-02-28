@@ -45,6 +45,7 @@
 				BEntity* m_rng;
 // 				BeRand m_randomizer;
 				BEntity* m_critter_unit_container;
+				BEntity* m_critter_energy_total;
 
 		};
 

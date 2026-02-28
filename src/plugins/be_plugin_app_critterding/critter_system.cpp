@@ -77,8 +77,10 @@
 			auto stats = settings->addChild( "stats", new BEntity() );
 			m_stats_births_total = stats->addChild( "births_total", new BEntity_uint() );
 			m_stats_deaths_total = stats->addChild( "deaths_total", new BEntity_uint() );
+			m_stats_energy_total = stats->addChild( "energy_total", new BEntity_float() );
 			m_stats_births_total->set( Buint(0) );
 			m_stats_deaths_total->set( Buint(0) );
+			m_stats_energy_total->set( Bfloat(0.0f) );
 		
 		m_mouse_picker = 0;
 		auto ext = parent()->getChild("external_mousepicker", 1);
@@ -116,6 +118,7 @@
 					// critter_unit->m_always_firing_input->onUpdate();
 				}
 			}
+			m_stats_energy_total->set( total_energy_in_entities );
 
 		// INSERT NEW RANDOM CRITTER, only check every 100 frames
 			if ( m_minimum_number_of_units->get_uint() > 0 && (++m_framecount == m_insert_frame_interval->get_uint() || m_insert_frame_interval->get_uint() == 0 ) )
@@ -441,6 +444,8 @@
 		addChild( "adam_distance", new BEntity_uint() )->set( Buint(0) );
 		
 		m_brain_inputs = 0;
+		m_brain_vision_input_start = 0;
+		m_brain_vision_input_start_index = 0;
 		m_transform_shortcut = 0;
 		m_physics_component_shortcut = 0;
 		m_bodyparts_shortcut = 0;

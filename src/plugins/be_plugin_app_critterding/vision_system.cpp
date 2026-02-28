@@ -39,6 +39,9 @@
 		// m_print->set( true );
 		m_critter_sightrange = addChild("sight_range", new BEntity_float());
 		m_critter_sightrange->set( 8.0f );
+		m_update_every_n_ticks = addChild("update_every_n_ticks", new BEntity_uint());
+		m_update_every_n_ticks->set( Buint(5) );
+		m_tick_counter = 0;
 
 		m_critter_containers = addChild("critter_containers", new BEntity());
 		
@@ -83,6 +86,7 @@
 		m_ProjectionMatrixGLM = glm::perspective( SIMD_PI / 4, 1280.0f/800.0f, 0.1f, m_critter_sightrange->get_float() );
 		
 		m_skyDome = 0;
+		m_visible_models_cache_source_count = 0;
 		
 	} 
 
@@ -94,6 +98,24 @@
 			if ( !m_skyDome )
 			{
 				m_skyDome = m_graphics_model_system->getChild("GraphicsModel_SkyDome", 1);
+			}
+			const auto source_model_count = m_graphics_model_system->numChildren();
+			if ( m_visible_models_cache.empty() || m_visible_models_cache_source_count != source_model_count )
+			{
+				m_visible_models_cache.clear();
+				m_visible_models_cache_source_count = source_model_count;
+				const auto& model_entities = m_graphics_model_system->children();
+				for ( auto* entity : model_entities )
+				{
+					if ( entity != m_skyDome )
+					{
+						auto model = dynamic_cast<BGraphicsModel*>( entity );
+						if ( model )
+						{
+							m_visible_models_cache.push_back( model );
+						}
+					}
+				}
 			}
 
 			glUseProgram( m_graphics_model_system->m_effect_critter->m_program.get()->handle() );
@@ -112,15 +134,26 @@
 
 			bool empty(true);
 			unsigned int critter_counter = 0;
+			unsigned int global_critter_index = 0;
+			const auto update_every_n_ticks = std::max(1u, m_update_every_n_ticks->get_uint());
+			const auto current_phase = m_tick_counter % update_every_n_ticks;
+			std::vector<CdCritter*> rendered_critters;
 			for_all_children_of2( m_critter_containers )
 			{
 				auto container = (*child2)->get_reference();
 				for_all_children_of( container )
 				{
+					if ( (global_critter_index % update_every_n_ticks) != current_phase )
+					{
+						++global_critter_index;
+						continue;
+					}
+
 					calcFramePos( critter_counter );
 
 					empty = false;
 					CdCritter* critter = dynamic_cast<CdCritter*>( (*child) );
+					rendered_critters.push_back( critter );
 
 					if ( critter->m_physics_component_shortcut == 0 )
 					{
@@ -143,23 +176,17 @@
 							glUniformMatrix4fv( m_ProjectionViewMatrixID, 1, GL_FALSE, glm::value_ptr(m_pvMatrix) );
 
 						// DRAW WORLD
-							// draw entities within sight, but not skydome
-								for_all_children_of3( m_graphics_model_system )
-								{
-									if (  (*child3) != m_skyDome )
-									{
-										auto model = dynamic_cast<BGraphicsModel*>( (*child3) );
-										if ( model )
-										{
-											model->processWhenInSight( &bodypart_to_attach_cam->getTransform(), m_critter_sightrange->get_float() );
-										}
-									}
-								}
+							for ( auto* model : m_visible_models_cache )
+							{
+								model->processWhenInSight( &bodypart_to_attach_cam->getTransform(), m_critter_sightrange->get_float() );
+							}
 
 						++critter_counter;
 					}
+					++global_critter_index;
 				}
 			}
+			++m_tick_counter;
 
 			// Read pixels into retina
 			if ( !empty )
@@ -187,89 +214,99 @@
 					critter_counter = 0;
 					float value;
 					float fvalue;
-					for_all_children_of2( m_critter_containers )
+					for ( auto* critter : rendered_critters )
 					{
-						auto container = (*child2)->get_reference();
-						for_all_children_of( container )
-						// for_all_children_of( m_unit_container )
+						// cache brain input root and first vision input node
+						if ( critter->m_brain_inputs == 0 )
 						{
-							CdCritter* critter = dynamic_cast<CdCritter*>( (*child) );
-
-							// while vision_value_R not found
-							if ( critter->m_brain_inputs == 0 )
-							{
-								critter->m_brain_inputs = (*child)->getChild("external_brain", 1)->get_reference()->getChild("inputs", 1);
-							}
-							
-							// setup inputs and cycle through to the correct input
+							critter->m_brain_inputs = critter->getChild("external_brain", 1)->get_reference()->getChild("inputs", 1);
+						}
+						if ( critter->m_brain_vision_input_start == 0 )
+						{
 							const auto& brain_inputs_children_vector = critter->m_brain_inputs->children();
-							const auto& brain_inputs_begin = brain_inputs_children_vector.begin();
-							const auto& brain_inputs_end = brain_inputs_children_vector.end();
-							auto brain_input = brain_inputs_begin;
-							while ( brain_input != brain_inputs_end && (*brain_input)->name() != "vision_value_R" )
+							for ( unsigned int i = 0; i < brain_inputs_children_vector.size(); ++i )
 							{
-								// std::cout << (*brain_input)->name() << std::endl;
-								++brain_input;
-							}
-
-							// FEED
-							calcFramePos( critter_counter );
-							for ( unsigned int h=retinaRowStart; h < retinaRowStart+(m_critter_retinasize*retinaRowLength); h += retinaRowLength )
-							{
-								for ( unsigned int w=h+retinaColumnStart; w < h+retinaColumnStart+(m_critter_retinasize*4); ++w )
+								auto* input = brain_inputs_children_vector[i];
+								if ( input->name() == "vision_value_R" )
 								{
-									value = (int)retina[w];
-									if ( value > 0 )
-									{
-										fvalue = (float)value / 255;
-										// std::cout << "setting brain_input " << (*brain_input)->name() << " to " << ((float)(int)retina[w]) / 255 << std::endl;
-
-										// if it's the same, force update to outputs
-										if ( !(*brain_input)->set( fvalue ) )
-										{
-											(*brain_input)->onUpdate();
-										}
-									}
-									++brain_input;
+									critter->m_brain_vision_input_start = input;
+									critter->m_brain_vision_input_start_index = i;
+									break;
 								}
 							}
-
-							++critter_counter;
 						}
+						if ( !critter->m_brain_vision_input_start )
+						{
+							++critter_counter;
+							continue;
+						}
+						const auto& brain_inputs_children_vector = critter->m_brain_inputs->children();
+						auto brain_input_index = critter->m_brain_vision_input_start_index;
+						if ( brain_input_index >= brain_inputs_children_vector.size() )
+						{
+							critter->m_brain_vision_input_start = 0;
+							++critter_counter;
+							continue;
+						}
+
+						// FEED
+						calcFramePos( critter_counter );
+						for ( unsigned int h=retinaRowStart; h < retinaRowStart+(m_critter_retinasize*retinaRowLength); h += retinaRowLength )
+						{
+							for ( unsigned int w=h+retinaColumnStart; w < h+retinaColumnStart+(m_critter_retinasize*4); ++w )
+							{
+								value = (int)retina[w];
+								if ( value > 0 )
+								{
+									fvalue = (float)value / 255;
+									// std::cout << "setting brain_input " << (*brain_input)->name() << " to " << ((float)(int)retina[w]) / 255 << std::endl;
+
+									// if it's the same, force update to outputs
+									auto* brain_input = brain_inputs_children_vector[brain_input_index];
+									if ( !brain_input->set( fvalue ) )
+									{
+										brain_input->onUpdate();
+									}
+								}
+								++brain_input_index;
+								if ( brain_input_index >= brain_inputs_children_vector.size() )
+								{
+									break;
+								}
+							}
+						}
+
+						++critter_counter;
 					}
 
 				// PRINT
 					if ( m_print->get_bool() )
 					{
 						critter_counter = 0;
-						for_all_children_of2( m_critter_containers )
+						for ( auto* critter : rendered_critters )
 						{
-							auto container = (*child2)->get_reference();
-							for_all_children_of( container )
-							// for_all_children_of( m_unit_container )
-							{
-								calcFramePos(critter_counter);
-								std::cout << "critter " << critter_counter << ":" << " x:" << retinaColumnStart << " y:" << retinaRowStart << " retinaRowLength: " << retinaRowLength << std::endl;
+							(void)critter;
+							calcFramePos(critter_counter);
+							std::cout << "critter " << critter_counter << ":" << " x:" << retinaColumnStart << " y:" << retinaRowStart << " retinaRowLength: " << retinaRowLength << std::endl;
 
-								for ( unsigned int h=retinaRowStart; h < retinaRowStart+(m_critter_retinasize*retinaRowLength); h += retinaRowLength )
+							for ( unsigned int h=retinaRowStart; h < retinaRowStart+(m_critter_retinasize*retinaRowLength); h += retinaRowLength )
+							{
+								for ( unsigned int w=h+retinaColumnStart; w < h+retinaColumnStart+(m_critter_retinasize*4); w+=4 )
 								{
-									for ( unsigned int w=h+retinaColumnStart; w < h+retinaColumnStart+(m_critter_retinasize*4); w+=4 )
-									{
-										if ( (int)retina[w+0] > 80 ) std::cout << "\033[1;31mR\033[0m";
-										else std::cout << ".";
-										if ( (int)retina[w+1] > 80 ) std::cout << "\033[1;32mG\033[0m";
-										else std::cout << ".";
-										if ( (int)retina[w+2] > 80 ) std::cout << "\033[1;34mB\033[0m";
-										else std::cout << ".";
-										if ( (int)retina[w+3] > 80 ) std::cout << "\033[1;35mA\033[0m";
-										else std::cout << ".";
-									}
-									std::cout << std::endl;
+									if ( (int)retina[w+0] > 80 ) std::cout << "\033[1;31mR\033[0m";
+									else std::cout << ".";
+									if ( (int)retina[w+1] > 80 ) std::cout << "\033[1;32mG\033[0m";
+									else std::cout << ".";
+									if ( (int)retina[w+2] > 80 ) std::cout << "\033[1;34mB\033[0m";
+									else std::cout << ".";
+									if ( (int)retina[w+3] > 80 ) std::cout << "\033[1;35mA\033[0m";
+									else std::cout << ".";
 								}
 								std::cout << std::endl;
-
-								critter_counter++;
 							}
+							std::cout << std::endl;
+
+							critter_counter++;
 						}
 					}
 			}
