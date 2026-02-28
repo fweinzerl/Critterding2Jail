@@ -124,10 +124,13 @@
 			m_mouse_y = glwindow->getChild( "mouse_y", 1 );
 
 		// SDL SWAPBUFFER, making sure this runs right after sdl_window and it's children are done processing
-			addChild("GLSwapBuffers", "GLSwapBuffers")->set("set_glwindow", glwindow);
+			auto swap_buffers = addChild("GLSwapBuffers", "GLSwapBuffers");
+			swap_buffers->set("set_glwindow", glwindow);
+			swap_buffers->setFps(50);
 
 		// GRAPHICS MODELSYSTEM
 			auto t_graphicsModelSystem = glwindow->addChild("GraphicsModelSystem", "GraphicsModelSystem");
+			t_graphicsModelSystem->setFps(50);
 
 		// CAMERA
 			// m_camera = new BCamera();
