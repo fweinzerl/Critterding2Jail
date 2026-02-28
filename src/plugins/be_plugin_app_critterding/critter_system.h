@@ -2,10 +2,12 @@
 
 #include "kernel/be_entity_interface.h"
 #include "kernel/be_entity_ops_copy.h"
+#include <limits>
 
 	class CdSpeciesSystem;
 	class BeRigidBody;
 	class BMousePicker;
+	class CdCritter;
 
 	//  SYSTEM
 		class CdCritterSystem : public BEntity
@@ -22,6 +24,12 @@
 				virtual bool set( const Bstring& id, BEntity* value );
 
 			private:
+				void updateLifetimeLearning();
+				void ensureLearningShortcuts(CdCritter* critter);
+				void resetLearningState(CdCritter* critter);
+				float readVisionGreenSum(CdCritter* critter);
+				bool mutateBrainSlightly(CdCritter* critter);
+
 				BMousePicker* m_mouse_picker;
 				BEntity* m_unit_container;
 				bool removeFromCollisions( BEntity* to_remove );
@@ -29,6 +37,7 @@
 				BEntityCopy m_entityCopy;
 				// BEntityLoad m_entityLoad;
 				BEntity* m_command_buffer;
+				BEntity* m_rng;
 				
 				BEntity* m_insert_frame_interval;
 				unsigned int m_framecount;
@@ -48,6 +57,14 @@
 				BEntity* m_stats_births_total;
 				BEntity* m_stats_deaths_total;
 				BEntity* m_stats_energy_total;
+				BEntity* m_learning_enabled;
+				BEntity* m_learning_episode_ticks;
+				BEntity* m_learning_reward_energy_weight;
+				BEntity* m_learning_reward_green_weight;
+				BEntity* m_learning_reward_tick_cost;
+				BEntity* m_learning_explore_mutation_chance;
+				BEntity* m_stats_learning_avg_episode_reward;
+				BEntity* m_stats_learning_mutations_total;
 				
 				CdSpeciesSystem* m_species_system;
 				BEntity* m_body_system_unit_container;
@@ -58,7 +75,16 @@
 		class CdCritter : public BEntity
 		{
 			public:
-				CdCritter() {};
+				CdCritter()
+					: m_brain(0), m_brain_inputs(0), m_brain_vision_input_start(0), m_brain_vision_input_start_index(0),
+					  m_learning_initialized(false), m_learning_episode_tick(0), m_learning_episode_reward(0.0f),
+					  m_learning_best_episode_reward(0.0f), m_learning_previous_energy(0.0f), m_learning_previous_green(0.0f),
+					  m_learning_episode_tick_entity(0), m_learning_episode_reward_entity(0),
+					  m_learning_best_episode_reward_entity(0), m_learning_last_reward_entity(0), m_learning_last_green_entity(0),
+					  m_transform_shortcut(0), m_physics_component_shortcut(0), m_bodyparts_shortcut(0),
+					  m_age(0), m_energy(0), m_species(0)
+				{
+				};
 				const char* class_id() const { return "CdCritter"; }
 				virtual ~CdCritter() {};
 				void construct();
@@ -72,6 +98,17 @@
 				BEntity* m_brain_inputs;
 				BEntity* m_brain_vision_input_start;
 				unsigned int m_brain_vision_input_start_index;
+				bool m_learning_initialized;
+				unsigned int m_learning_episode_tick;
+				float m_learning_episode_reward;
+				float m_learning_best_episode_reward;
+				float m_learning_previous_energy;
+				float m_learning_previous_green;
+				BEntity* m_learning_episode_tick_entity;
+				BEntity* m_learning_episode_reward_entity;
+				BEntity* m_learning_best_episode_reward_entity;
+				BEntity* m_learning_last_reward_entity;
+				BEntity* m_learning_last_green_entity;
 
 				// performance shortcuts
 				BEntity* m_transform_shortcut;

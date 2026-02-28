@@ -2,6 +2,7 @@
 #include "kernel/be_entity_core_types.h"
 // #include "species_system.h"
 #include "plugins/be_plugin_bullet/be_entity_mousepicker.h"
+#include <limits>
 // #include <iostream>
  
 	void CdCritterSystem::construct()
@@ -81,11 +82,28 @@
 			m_stats_births_total->set( Buint(0) );
 			m_stats_deaths_total->set( Buint(0) );
 			m_stats_energy_total->set( Bfloat(0.0f) );
+			m_learning_enabled = settings->addChild( "learning_enabled", new BEntity_bool() );
+			m_learning_episode_ticks = settings->addChild( "learning_episode_ticks", new BEntity_uint() );
+			m_learning_reward_energy_weight = settings->addChild( "learning_reward_energy_weight", new BEntity_float() );
+			m_learning_reward_green_weight = settings->addChild( "learning_reward_green_weight", new BEntity_float() );
+			m_learning_reward_tick_cost = settings->addChild( "learning_reward_tick_cost", new BEntity_float() );
+			m_learning_explore_mutation_chance = settings->addChild( "learning_explore_mutation_chance", new BEntity_uint() );
+			m_learning_enabled->set( true );
+			m_learning_episode_ticks->set( Buint(30) );
+			m_learning_reward_energy_weight->set( Bfloat(0.02f) );
+			m_learning_reward_green_weight->set( Bfloat(0.40f) );
+			m_learning_reward_tick_cost->set( Bfloat(0.01f) );
+			m_learning_explore_mutation_chance->set( Buint(5) );
+			m_stats_learning_avg_episode_reward = stats->addChild( "learning_avg_episode_reward", new BEntity_float() );
+			m_stats_learning_mutations_total = stats->addChild( "learning_mutations_total", new BEntity_uint() );
+			m_stats_learning_avg_episode_reward->set( Bfloat(0.0f) );
+			m_stats_learning_mutations_total->set( Buint(0) );
 		
 		m_mouse_picker = 0;
 		auto ext = parent()->getChild("external_mousepicker", 1);
 		if ( ext )
 			m_mouse_picker = dynamic_cast<BMousePicker*>( ext->get_reference() );
+		m_rng = parent()->getChild( "random_number_generator", 1 );
 
 		m_collisions = 0;
 	}
@@ -119,6 +137,7 @@
 				}
 			}
 			m_stats_energy_total->set( total_energy_in_entities );
+			updateLifetimeLearning();
 
 		// INSERT NEW RANDOM CRITTER, only check every 100 frames
 			if ( m_minimum_number_of_units->get_uint() > 0 && (++m_framecount == m_insert_frame_interval->get_uint() || m_insert_frame_interval->get_uint() == 0 ) )
@@ -203,6 +222,7 @@
 						auto critter_unit = new CdCritter();
 						m_unit_container->addChild( "critter_unit", critter_unit );
 						critter_unit->setEnergy( m_intitial_energy->get_float() );
+						resetLearningState( critter_unit );
 						m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
 
 					// BODY
@@ -303,11 +323,30 @@
 			// COPY CRITTER
 				auto critter_new = dynamic_cast<CdCritter*>( m_entityCopy.copyEntity( critter_unit ) );
 				critter_new->getChild( "age", 1 )->set( Buint(0) );
+				resetLearningState( critter_new );
 				// critter_new->getChild( "energy", 1 )->set( Buint(0) );
 
 			// CHANGE POSITION to above parent
 			if ( !m_copy_random_position->get_bool() )
 			{
+				float spawn_offset_x(0.0f);
+				float spawn_offset_z(0.0f);
+				if ( m_rng )
+				{
+					m_rng->set( "min", Bint(-250) );
+					m_rng->set( "max", Bint(250) );
+					spawn_offset_x = 0.01f * m_rng->get_int();
+					m_rng->set( "min", Bint(-250) );
+					m_rng->set( "max", Bint(250) );
+					spawn_offset_z = 0.01f * m_rng->get_int();
+					if ( spawn_offset_x > -0.3f && spawn_offset_x < 0.3f &&
+					     spawn_offset_z > -0.3f && spawn_offset_z < 0.3f )
+					{
+						spawn_offset_x = 1.5f;
+						spawn_offset_z = -1.5f;
+					}
+				}
+
 				auto bodyparts_old = critter_unit->getChild( "external_body", 1 )->get_reference()->getChild( "body_fixed1", 1 )->getChild( "bodyparts", 1 );
 				critter_new->m_bodyparts_shortcut = critter_new->getChild( "external_body", 1 )->get_reference()->getChild( "body_fixed1", 1 )->getChild( "bodyparts", 1 );
 				
@@ -321,9 +360,9 @@
 					if ( t )
 					{
 						// std::cout << "changing position" << std::endl;
-						t->set("position_x", oldt->get_float("position_x"));
+						t->set("position_x", oldt->get_float("position_x") + spawn_offset_x);
 						t->set("position_y", oldt->get_float("position_y") + 0.75f);
-						t->set("position_z", oldt->get_float("position_z"));
+						t->set("position_z", oldt->get_float("position_z") + spawn_offset_z);
 					}
 					old_child++;
 				}
@@ -366,6 +405,262 @@
 		// 	return true;
 		// }
 		return false;
+	}
+
+	void CdCritterSystem::ensureLearningShortcuts(CdCritter* critter)
+	{
+		if ( critter->m_learning_episode_tick_entity != 0 )
+		{
+			return;
+		}
+
+		auto learning = critter->getChild( "learning", 1 );
+		critter->m_learning_episode_tick_entity = learning->getChild( "episode_tick", 1 );
+		critter->m_learning_episode_reward_entity = learning->getChild( "episode_reward", 1 );
+		critter->m_learning_best_episode_reward_entity = learning->getChild( "best_episode_reward", 1 );
+		critter->m_learning_last_reward_entity = learning->getChild( "last_reward", 1 );
+		critter->m_learning_last_green_entity = learning->getChild( "last_green", 1 );
+	}
+
+	void CdCritterSystem::resetLearningState(CdCritter* critter)
+	{
+		ensureLearningShortcuts( critter );
+		critter->m_learning_initialized = false;
+		critter->m_learning_episode_tick = 0;
+		critter->m_learning_episode_reward = 0.0f;
+		critter->m_learning_best_episode_reward = -std::numeric_limits<float>::max();
+		critter->m_learning_previous_energy = critter->energy();
+		critter->m_learning_previous_green = 0.0f;
+		critter->m_learning_episode_tick_entity->set( Buint(0) );
+		critter->m_learning_episode_reward_entity->set( Bfloat(0.0f) );
+		critter->m_learning_best_episode_reward_entity->set( Bfloat(0.0f) );
+		critter->m_learning_last_reward_entity->set( Bfloat(0.0f) );
+		critter->m_learning_last_green_entity->set( Bfloat(0.0f) );
+	}
+
+	float CdCritterSystem::readVisionGreenSum(CdCritter* critter)
+	{
+		if ( critter->m_brain_inputs == 0 )
+		{
+			critter->m_brain_inputs = critter->getChild( "external_brain", 1 )->get_reference()->getChild( "inputs", 1 );
+		}
+		if ( critter->m_brain_vision_input_start == 0 )
+		{
+			const auto& inputs = critter->m_brain_inputs->children();
+			for ( unsigned int i = 0; i < inputs.size(); ++i )
+			{
+				if ( inputs[i]->name() == "vision_value_R" )
+				{
+					critter->m_brain_vision_input_start = inputs[i];
+					critter->m_brain_vision_input_start_index = i;
+					break;
+				}
+			}
+		}
+		if ( critter->m_brain_vision_input_start == 0 )
+		{
+			return 0.0f;
+		}
+
+		const auto& inputs = critter->m_brain_inputs->children();
+		const auto start = critter->m_brain_vision_input_start_index;
+		const auto green_start = start + 1;
+		const auto pixels = 8u * 8u;
+		float green_sum(0.0f);
+		for ( unsigned int i = 0; i < pixels; ++i )
+		{
+			const auto index = green_start + (i * 4);
+			if ( index >= inputs.size() )
+			{
+				break;
+			}
+			green_sum += inputs[index]->get_float();
+		}
+		return green_sum;
+	}
+
+	bool CdCritterSystem::mutateBrainSlightly(CdCritter* critter)
+	{
+		// TODO: Temporary duplicate mutation path for stable lifetime learning; unify with BrainSystem mutation profiles.
+		if ( m_rng == 0 || critter->m_brain == 0 )
+		{
+			return false;
+		}
+
+		auto neurons = critter->m_brain->getChild( "neurons", 1 );
+		if ( !neurons || neurons->numChildren() == 0 )
+		{
+			return false;
+		}
+
+		m_rng->set( "min", 0 );
+		m_rng->set( "max", Bint(neurons->numChildren()) - 1 );
+		auto neuron = neurons->children()[ m_rng->get_int() ];
+		if ( !neuron )
+		{
+			return false;
+		}
+
+		m_rng->set( "min", -50 );
+		m_rng->set( "max", 50 );
+		const auto delta = 0.001f * m_rng->get_int();
+
+		m_rng->set( "min", 0 );
+		m_rng->set( "max", 2 );
+		const auto mode = m_rng->get_int();
+
+		if ( mode == 0 )
+		{
+			auto target = neuron->getChild( "firingWeight", 1 );
+			if ( !target )
+			{
+				return false;
+			}
+			target->set( target->get_float() + delta );
+			return true;
+		}
+
+		if ( mode == 1 )
+		{
+			auto target = neuron->getChild( "firingThreshold", 1 );
+			if ( !target )
+			{
+				return false;
+			}
+			target->set( target->get_float() + delta );
+			return true;
+		}
+
+		auto synapses = neuron->getChild( "synapses", 1 );
+		if ( !synapses || synapses->numChildren() == 0 )
+		{
+			auto target = neuron->getChild( "firingWeight", 1 );
+			if ( !target )
+			{
+				return false;
+			}
+			target->set( target->get_float() + delta );
+			return true;
+		}
+
+		m_rng->set( "min", 0 );
+		m_rng->set( "max", Bint(synapses->numChildren()) - 1 );
+		auto synapse = synapses->children()[ m_rng->get_int() ];
+		if ( !synapse )
+		{
+			return false;
+		}
+		auto weight = synapse->getChild( "weight", 1 );
+		if ( !weight )
+		{
+			return false;
+		}
+
+		weight->set( weight->get_float() + delta );
+		return true;
+	}
+
+	void CdCritterSystem::updateLifetimeLearning()
+	{
+		if ( !m_learning_enabled->get_bool() )
+		{
+			return;
+		}
+
+		const auto episode_ticks = std::max( 1u, m_learning_episode_ticks->get_uint() );
+		const auto reward_energy_weight = m_learning_reward_energy_weight->get_float();
+		const auto reward_green_weight = m_learning_reward_green_weight->get_float();
+		const auto reward_tick_cost = m_learning_reward_tick_cost->get_float();
+		const auto explore_mutation_chance = m_learning_explore_mutation_chance->get_uint();
+		float completed_episode_reward_sum(0.0f);
+		unsigned int completed_episodes(0);
+
+		for_all_children_of( m_unit_container )
+		{
+			auto critter = dynamic_cast<CdCritter*>( *child );
+			if ( !critter )
+			{
+				continue;
+			}
+
+			ensureLearningShortcuts( critter );
+			const auto current_energy = critter->energy();
+			const auto current_green = readVisionGreenSum( critter );
+			if ( !critter->m_learning_initialized )
+			{
+				critter->m_learning_previous_energy = current_energy;
+				critter->m_learning_previous_green = current_green;
+				critter->m_learning_initialized = true;
+			}
+
+			const auto delta_energy = current_energy - critter->m_learning_previous_energy;
+			const auto delta_green = current_green - critter->m_learning_previous_green;
+			float effective_delta_green(delta_green);
+			if ( delta_energy > 0.0f && effective_delta_green < 0.0f )
+			{
+				effective_delta_green = 0.0f;
+			}
+			const auto reward = (reward_energy_weight * delta_energy) + (reward_green_weight * effective_delta_green) - reward_tick_cost;
+			critter->m_learning_previous_energy = current_energy;
+			critter->m_learning_previous_green = current_green;
+			critter->m_learning_episode_reward += reward;
+			++critter->m_learning_episode_tick;
+			critter->m_learning_last_reward_entity->set( Bfloat(reward) );
+			critter->m_learning_last_green_entity->set( Bfloat(current_green) );
+			critter->m_learning_episode_reward_entity->set( Bfloat(critter->m_learning_episode_reward) );
+			critter->m_learning_episode_tick_entity->set( Buint(critter->m_learning_episode_tick) );
+
+			if ( critter->m_learning_episode_tick < episode_ticks )
+			{
+				continue;
+			}
+
+			const auto episode_reward = critter->m_learning_episode_reward;
+			completed_episode_reward_sum += episode_reward;
+			++completed_episodes;
+			if ( critter->m_brain == 0 )
+			{
+				auto external_brain = critter->getChild( "external_brain", 1 );
+				if ( external_brain )
+				{
+					critter->m_brain = external_brain->get_reference();
+				}
+			}
+			bool should_mutate(false);
+			if ( episode_reward >= critter->m_learning_best_episode_reward )
+			{
+				critter->m_learning_best_episode_reward = episode_reward;
+			}
+			else
+			{
+				should_mutate = true;
+			}
+
+			if ( !should_mutate && m_rng && explore_mutation_chance > 0 )
+			{
+				m_rng->set( "min", 1 );
+				m_rng->set( "max", 100 );
+				should_mutate = ((Buint)m_rng->get_int() <= explore_mutation_chance);
+			}
+
+			if ( should_mutate && mutateBrainSlightly( critter ) )
+			{
+				m_stats_learning_mutations_total->set( m_stats_learning_mutations_total->get_uint() + 1 );
+			}
+
+			critter->m_learning_episode_reward = 0.0f;
+			critter->m_learning_episode_tick = 0;
+			critter->m_learning_episode_reward_entity->set( Bfloat(0.0f) );
+			critter->m_learning_episode_tick_entity->set( Buint(0) );
+			critter->m_learning_best_episode_reward_entity->set( Bfloat(critter->m_learning_best_episode_reward) );
+		}
+
+		if ( completed_episodes > 0 )
+		{
+			const auto avg = completed_episode_reward_sum / completed_episodes;
+			const auto prev = m_stats_learning_avg_episode_reward->get_float();
+			m_stats_learning_avg_episode_reward->set( Bfloat((prev * 0.9f) + (avg * 0.1f)) );
+		}
 	}
 
 		void CdCritterSystem::removeCritter( BEntity* entity, bool force_direct_deletion )
@@ -446,6 +741,23 @@
 		m_brain_inputs = 0;
 		m_brain_vision_input_start = 0;
 		m_brain_vision_input_start_index = 0;
+		m_learning_initialized = false;
+		m_learning_episode_tick = 0;
+		m_learning_episode_reward = 0.0f;
+		m_learning_best_episode_reward = -std::numeric_limits<float>::max();
+		m_learning_previous_energy = 0.0f;
+		m_learning_previous_green = 0.0f;
+		auto learning = addChild( "learning", new BEntity() );
+		m_learning_episode_tick_entity = learning->addChild( "episode_tick", new BEntity_uint() );
+		m_learning_episode_reward_entity = learning->addChild( "episode_reward", new BEntity_float() );
+		m_learning_best_episode_reward_entity = learning->addChild( "best_episode_reward", new BEntity_float() );
+		m_learning_last_reward_entity = learning->addChild( "last_reward", new BEntity_float() );
+		m_learning_last_green_entity = learning->addChild( "last_green", new BEntity_float() );
+		m_learning_episode_tick_entity->set( Buint(0) );
+		m_learning_episode_reward_entity->set( Bfloat(0.0f) );
+		m_learning_best_episode_reward_entity->set( Bfloat(0.0f) );
+		m_learning_last_reward_entity->set( Bfloat(0.0f) );
+		m_learning_last_green_entity->set( Bfloat(0.0f) );
 		m_transform_shortcut = 0;
 		m_physics_component_shortcut = 0;
 		m_bodyparts_shortcut = 0;
