@@ -21,6 +21,8 @@ namespace
 		float scale_x;
 		float scale_y;
 		float scale_z;
+		bool has_friction_override;
+		float friction_override;
 	};
 
 	struct BodyPlanHinge
@@ -59,6 +61,8 @@ namespace
 	};
 
 	BodyPlanConfig g_verified_body_plan;
+
+	void fatal_body_plan_error( const std::string& message );
 
 	bool read_file_text( const std::string& path, std::string& out_text )
 	{
@@ -160,6 +164,28 @@ namespace
 		return stream.eof();
 	}
 
+	bool json_get_optional_number( const std::string& text, const std::string& key, float& target )
+	{
+		std::string raw;
+		if ( !json_find_field_value(text, key, raw) )
+		{
+			return false;
+		}
+		std::istringstream stream(raw);
+		stream.imbue(std::locale::classic());
+		stream >> target;
+		if ( stream.fail() )
+		{
+			fatal_body_plan_error(std::string("invalid numeric value for optional key '") + key + "'");
+		}
+		stream >> std::ws;
+		if ( !stream.eof() )
+		{
+			fatal_body_plan_error(std::string("invalid trailing data for optional key '") + key + "'");
+		}
+		return true;
+	}
+
 	bool json_get_required_uint( const std::string& text, const std::string& key, unsigned int& target )
 	{
 		float number(0.0f);
@@ -254,6 +280,7 @@ namespace
 			if ( !json_get_required_number(text, "part_" + id + "_scale_x", part.scale_x) ) return false;
 			if ( !json_get_required_number(text, "part_" + id + "_scale_y", part.scale_y) ) return false;
 			if ( !json_get_required_number(text, "part_" + id + "_scale_z", part.scale_z) ) return false;
+			part.has_friction_override = json_get_optional_number(text, "part_" + id + "_friction", part.friction_override);
 			cfg.parts.push_back(part);
 		}
 
@@ -363,7 +390,7 @@ namespace
 		m_bodypart_friction->set( 0.95f );
 		m_bodypart_restitution->set( 0.95f );
 		m_bodypart_density->set( 100.0f );
-		m_body_plan_file->set( "config/body_plan.default.json" );
+		m_body_plan_file->set( "config/body_plan.mudskipper.json" );
 		verify_and_cache_body_plan_or_die( m_body_plan_file->get_string() );
 		m_bodypart_friction->set( g_verified_body_plan.bodypart_friction );
 		m_bodypart_restitution->set( g_verified_body_plan.bodypart_restitution );
@@ -438,7 +465,8 @@ namespace
 			);
 			built_parts.push_back(bodypart);
 
-			bodypart->set("friction", plan.bodypart_friction);
+			const auto part_friction = part.has_friction_override ? part.friction_override : plan.bodypart_friction;
+			bodypart->set("friction", part_friction);
 			bodypart->set("restitution", plan.bodypart_restitution);
 		}
 
