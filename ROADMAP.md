@@ -1,6 +1,8 @@
-# Roadmap: Critterding2 -> 3D Raeuber-Beute-ALife (Vision B)
+# Roadmap: Critterding2 → 3D Raeuber-Beute-ALife
 
-Ziel: Ein stabiles, emergentes Oekosystem mit Charakter (Vision B), getrieben durch Red-Queen-Raeuber-Beute-Dynamik, in 3D, ohne dass das System in triviale Loesungen oder Extinktion kippt.
+Ziel: Ein stabiles, emergentes Oekosystem mit Charakter, getrieben durch
+Red-Queen-Raeuber-Beute-Dynamik, in 3D, ohne dass das System in triviale
+Loesungen oder Extinktion kippt.
 
 Wichtiger Fokus aus der Praxis: Wenn nach 10 Minuten kaum sichtbare Dynamik entsteht oder Bedienung frustriert, ist zuerst Beobachtbarkeit und Steuerbarkeit der Simulation der Engpass.
 
@@ -102,4 +104,45 @@ Abnahme:
 5) Actions: Steering + Speed-Intent.
 6) Teurer, klar definierter Angriff.
 
-Erst wenn dieser MVP stabil schwingt, folgen Gaits, Archetypen-Erweiterung und tiefere Morphologie.
+Erst wenn dieser MVP stabil schwingt, folgen Gaits, Archetypen-Erweiterung und
+tiefere Morphologie.
+
+---
+
+## 8) Beobachtbarkeit und Tooling
+
+Diese Aufgaben sind Voraussetzung fuer produktives Arbeiten an der Simulation
+und sollten parallel zu den Iterationen umgesetzt werden.
+
+### Control Panels vereinheitlichen
+
+Es gibt zwei separate `CdControlPanel`-Implementierungen:
+
+- `src/plugins/be_plugin_app_critterding/control_panel.*` (Single-Thread)
+- `src/plugins/be_plugin_app_critterding_threads/control_panel.*` (Multi-Thread)
+
+Zielarchitektur:
+1. Ein gemeinsames Panel mit einem schmalen Datenadapter.
+2. Zwei Provider: `SingleThreadProvider`, `ThreadsProvider`.
+3. Ein UI-Builder, ein Update-Loop.
+
+Abnahme:
+- Ein UI-Codepfad fuer Layout und Live-Updates.
+- Provider ist die einzige Stelle, die Single-/Multi-Thread-Unterschiede kennt.
+- Beide Startmodi funktionieren weiterhin.
+
+### Life/Death-Graphen im Life Stats Panel
+
+Scope (MVP):
+- Leichtgewichtige Zeitreihen-Charts in `CdLifeStatsPanel`.
+- Erste Kurven: Population (Kritter + Futter), Events (Births/Deaths pro Sekunde).
+- Feste Ring-Buffer (z. B. 300 Samples), Update bei Panel-Refresh-Rate.
+
+Spaeter:
+- Smoothing-Toggle, zusaetzliche Trends (avg Distanz, Energie-Verteilung).
+- Auto-Scale / Fixed-Scale Umschalter.
+
+Abnahme:
+- `F4` oeffnet ohne Absturz in beiden Runtimes.
+- Graphen aktualisieren sich kontinuierlich.
+- Keine schreibbaren Controls im Life Stats Panel.
