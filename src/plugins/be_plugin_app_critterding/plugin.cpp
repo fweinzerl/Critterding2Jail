@@ -55,6 +55,8 @@
 			auto settings = addChild( "settings", new BEntity() );
 			m_eat_transfer_energy = settings->addChild( "eat_energy_transfer", new BEntity_float() );
 			m_eat_transfer_energy->set( 100.0f );
+			m_eat_passive_fraction = settings->addChild( "eat_passive_fraction", new BEntity_float() );
+			m_eat_passive_fraction->set( 0.25f );
 
 		pluginManager()->load( "system", "src/plugins/be_plugin_system", "be_plugin_system" );
 		pluginManager()->load( "opengl", "src/plugins/be_plugin_opengl_modern", "be_plugin_opengl_modern" );
@@ -408,33 +410,35 @@
 				// std::cout << "collision e1: " << e1->name() << "(" << e1->id() << ")" << std::endl;
 				// std::cout << "collision e2: " << e2->name() << "(" << e2->id() << ")" << std::endl;
 
-				// EAT: TRANSFER ENERGY FROM FOOD TO CRITTER 
+				// EAT: TRANSFER ENERGY FROM FOOD TO CRITTER
+				// Energy scales with eat output: passive_base at eat=0, full at eat=1
 					auto critter = findCritter( e1, e2 );
 					if ( critter )
 					{
-						// CHECK MOTOR NEURON FIXME OPTIMIZE
-						auto eat = critter->getChild("motor_neurons", 1)->getChild("eat", 1);
-						if ( eat->get_float() != 0.0f ) // FIXME
+						auto food = findFood( e1, e2 );
+						if ( food )
 						{
-							eat->set( 0.0f );
+							auto eat = critter->getChild("motor_neurons", 1)->getChild("eat", 1);
+							float eat_value = eat->get_float();
+							if ( eat_value < 0.0f ) eat_value = 0.0f;
+							if ( eat_value > 1.0f ) eat_value = 1.0f;
 
-							auto food = findFood( e1, e2 );
-							if ( food )
+							float passive = m_eat_passive_fraction->get_float();
+							float scale = passive + (1.0f - passive) * eat_value;
+							float transfer = m_eat_transfer_energy->get_float() * scale;
+
+							auto critter_energy = critter->getChild("energy", 1);
+							auto food_energy = food->getChild("energy", 1);
+
+							if ( food_energy->get_float() < transfer )
 							{
-								// ENERGY TRANSFER
-								auto critter_energy = critter->getChild("energy", 1);
-								auto food_energy = food->getChild("energy", 1);
-
-								if ( food_energy->get_float() < m_eat_transfer_energy->get_float() )
-								{
-									critter_energy->set( critter_energy->get_float() + food_energy->get_float() );
-									food_energy->set( 0.0f );
-								}
-								else
-								{
-									critter_energy->set( critter_energy->get_float() + m_eat_transfer_energy->get_float() );
-									food_energy->set( food_energy->get_float() - m_eat_transfer_energy->get_float() );
-								}
+								critter_energy->set( critter_energy->get_float() + food_energy->get_float() );
+								food_energy->set( 0.0f );
+							}
+							else
+							{
+								critter_energy->set( critter_energy->get_float() + transfer );
+								food_energy->set( food_energy->get_float() - transfer );
 							}
 						}
 					}

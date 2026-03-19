@@ -165,6 +165,8 @@ namespace
 				m_oscillator_frequency_mutation_delta = settings->addChild( "oscillator_frequency_mutation_delta", new BEntity_float() );
 				m_oscillator_frequency_default->set( Bfloat(0.08f) );
 				m_oscillator_frequency_mutation_delta->set( Bfloat(0.01f) );
+				m_eat_active_cost = settings->addChild( "eat_active_cost", new BEntity_float() );
+				m_eat_active_cost->set( Bfloat(0.5f) );
 		
 		m_mouse_picker = 0;
 		auto ext = parent()->getChild("external_mousepicker", 1);
@@ -199,6 +201,19 @@ namespace
 				if ( critter_unit )
 				{
 					critter_unit->setAge( 1+critter_unit->age() );
+
+					// eat activation cost: penalize keeping eat output high
+					auto eat = critter_unit->getChild("motor_neurons", 1)->getChild("eat", 1);
+					if ( eat )
+					{
+						float eat_value = eat->get_float();
+						if ( eat_value > 0.0f )
+						{
+							if ( eat_value > 1.0f ) eat_value = 1.0f;
+							critter_unit->setEnergy( critter_unit->energy() - m_eat_active_cost->get_float() * eat_value );
+						}
+					}
+
 					total_energy_in_entities += critter_unit->energy();
 					updateOscillatorInputs( critter_unit );
 					// critter_unit->m_always_firing_input->onUpdate();

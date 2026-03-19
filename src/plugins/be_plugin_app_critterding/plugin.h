@@ -36,6 +36,7 @@
 				BEntity* m_food_unit_container;
 
 				BEntity* m_eat_transfer_energy;
+				BEntity* m_eat_passive_fraction;
 
 				BEntity* m_bullet_raycast;
 				BEntity* m_raycast_source_x;

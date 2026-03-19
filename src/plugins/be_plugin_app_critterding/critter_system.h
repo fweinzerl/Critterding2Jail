@@ -70,6 +70,7 @@
 					BEntity* m_stats_learning_mutations_total;
 					BEntity* m_oscillator_frequency_default;
 					BEntity* m_oscillator_frequency_mutation_delta;
+				BEntity* m_eat_active_cost;
 				
 				CdSpeciesSystem* m_species_system;
 				BEntity* m_body_system_unit_container;
