@@ -1,0 +1,181 @@
+# decisions.yaml
+meta:
+  project: "Critterding2"
+  description: "3D artificial life simulation producing emergent locomotion and animal behavior through environmental pressure"
+  audience: "ALife enthusiasts, educational use"
+  last_updated: "2026-03-21"
+
+nodes:
+  # ── Root ──────────────────────────────────────────────────────────────
+  - id: core_vision
+    label: "Emergent evolution of locomotion and animal behavior in a 3D simulation"
+    status: decided
+    depends_on: []
+    rejected_alternatives:
+      - what: "Explicit fitness functions / reward shaping"
+        why: "Emergence must come from environmental pressure, not engineered objectives"
+      - what: "Free topology evolution (NEAT-style) from the start"
+        why: "Temporarily restricted — system is too strict for open-ended evolution to produce results. Can be unlocked once basic evolution works."
+      - what: "Free morphology mutation from the start"
+        why: "Temporarily restricted — destabilizes physics before locomotion is solved. Can be unlocked once stable gaits exist."
+    note: "The environment drives evolution — the project succeeds when creatures develop without explicit guidance."
+
+  # ── First-level pillars ──────────────────────────────────────────────
+  - id: mechanical_locomotion
+    label: "Creatures evolve functional mechanical locomotion"
+    status: decided
+    depends_on:
+      - id: core_vision
+        why: "Locomotion is one of the two core emergent phenomena the project aims to produce"
+
+  - id: behavioral_diversity
+    label: "Distinct animal behavior roles emerge (predator, prey, scavenger, niche)"
+    status: decided
+    depends_on:
+      - id: core_vision
+        why: "Behavioral diversity is the primary measure of interesting emergence"
+
+  - id: modular_architecture
+    label: "Core systems are modular and swappable via abstract interfaces"
+    status: decided
+    depends_on:
+      - id: core_vision
+        why: "Experimentation with different brains, body plans, and subsystems requires hot-swappable modules — otherwise each variant means a rewrite"
+
+  - id: observability
+    label: "Simulation state and evolutionary progress are observable in real-time"
+    status: decided
+    depends_on:
+      - id: core_vision
+        why: "Emergence is only useful if it can be seen and understood — without observability, tuning and validation are blind"
+
+  # ── Milestone ────────────────────────────────────────────────────────
+  - id: first_milestone
+    label: "10 minutes of simulation produces observable behavioral change"
+    status: exploring
+    depends_on:
+      - id: core_vision
+        why: "This is the minimum proof that the environment creates evolutionary pressure"
+      - id: observability
+        why: "Without monitoring, behavioral change cannot be verified"
+    note: "Current system is too strict — creatures cannot evolve meaningfully before dying. Iron Maiden's phased bootstrapping addresses this."
+
+  # ── Modular architecture children ───────────────────────────────────
+  - id: plugin_architecture
+    label: "System is built from composable plugins with defined boundaries"
+    status: decided
+    depends_on:
+      - id: modular_architecture
+        why: "Plugins are the concrete mechanism that enforces modularity — each subsystem lives in its own plugin with explicit interfaces"
+
+  - id: swappable_brains
+    label: "Brain implementations are interchangeable behind a common abstract interface"
+    status: decided
+    depends_on:
+      - id: modular_architecture
+        why: "Multiple brain architectures (Brainz, Iron Maiden, future variants) must coexist and be compared without code changes"
+      - id: plugin_architecture
+        why: "Each brain type is a plugin — the abstract interface is the plugin boundary"
+    rejected_alternatives:
+      - what: "Single brain implementation with feature flags"
+        why: "Feature flags create combinatorial complexity and tangled code — separate plugins are cleaner"
+    note: "Currently controlled by a brain_type setting. Both Brainz and Iron Maiden must be selectable at startup."
+
+  - id: swappable_body_plans
+    label: "Body plans are data-driven JSON and swappable without code changes"
+    status: decided
+    depends_on:
+      - id: modular_architecture
+        why: "Different morphologies (default, mudskipper, future archetypes) must be testable by swapping a config file"
+    note: "Already implemented — body_plan.default.json, body_plan.mudskipper.json loaded at runtime."
+
+  # ── Locomotion children ─────────────────────────────────────────────
+  - id: cpg
+    label: "Central Pattern Generator provides rhythmic locomotion without brain involvement"
+    status: exploring
+    depends_on:
+      - id: mechanical_locomotion
+        why: "CPG gives locomotion for free — the brain modulates rather than generates movement"
+      - id: swappable_body_plans
+        why: "CPG parameters (phase, amplitude, turn gain) are per body plan"
+    rejected_alternatives:
+      - what: "Brain generates locomotion from scratch"
+        why: "Temporarily rejected — random networks cannot discover coordinated oscillation in reasonable time. May be revisited once evolution is stronger."
+    note: "Hard-wired oscillator. Brain controls speed (0-1) and turn (-1 to 1). Parameters tuned once per body plan."
+
+  - id: metabolic_pressure
+    label: "Standing still is costly — per-tick energy drain creates selection for movement"
+    status: decided
+    depends_on:
+      - id: mechanical_locomotion
+        why: "Without energy cost, the fitness landscape is flat — no selection signal for locomotion"
+      - id: first_milestone
+        why: "Metabolic pressure is the minimal gradient that makes 10-minute evolution possible"
+    note: "Default 0.1 energy/tick. At 1500 start energy, a still critter dies at 15000 ticks (before max age 18000)."
+
+  # ── Behavioral diversity children ───────────────────────────────────
+  - id: species_system
+    label: "At least two species (predator/prey) with distinct parameters"
+    status: exploring
+    depends_on:
+      - id: behavioral_diversity
+        why: "Species are the minimum unit of behavioral differentiation — without them, only one niche exists"
+    note: "Roadmap Iteration 1. Species as thin parameterization layer (metabolism, reproduction, movement costs)."
+
+  - id: environment_as_pressure
+    label: "3D environment creates spatial niches through obstacles, cover, and resource patches"
+    status: exploring
+    depends_on:
+      - id: behavioral_diversity
+        why: "Homogeneous space produces homogeneous behavior — spatial structure forces role differentiation"
+    note: "Roadmap Iteration 2. Cover for line-of-sight breaking, resource patches, refugia."
+
+  # ── Observability children ──────────────────────────────────────────
+  - id: unified_control_panel
+    label: "Single control panel UI with provider adapters for single/multi-thread modes"
+    status: exploring
+    depends_on:
+      - id: observability
+        why: "Two separate panel implementations mean double maintenance and inconsistent monitoring"
+      - id: plugin_architecture
+        why: "Provider pattern (SingleThreadProvider, ThreadsProvider) is a plugin boundary concern"
+
+  - id: life_stats_graphs
+    label: "Time-series charts for population, births/deaths in the life stats panel"
+    status: exploring
+    depends_on:
+      - id: observability
+        why: "Graphs are the fastest way to see whether the simulation is alive and evolving"
+    note: "Ring buffer (300 samples), update at panel refresh rate. F4 opens in both runtimes."
+
+  # ── Iron Maiden (brain) ─────────────────────────────────────────────
+  - id: iron_maiden_brain
+    label: "Minimal feedforward brain (6 inputs, 8 hidden, 3 outputs = 83 parameters)"
+    status: exploring
+    depends_on:
+      - id: swappable_brains
+        why: "Iron Maiden is one brain implementation behind the common brain interface"
+      - id: first_milestone
+        why: "The minimal brain is designed specifically to make the 10-minute evolution milestone achievable"
+    rejected_alternatives:
+      - what: "Continue with spiking network only"
+        why: "256 raw inputs into random synapses produces noise, not learning — too many parameters for gentle mutation"
+    note: "Outputs: speed (sigmoid 0-1), turn (tanh -1 to 1), eat (sigmoid 0-1). Weight count small enough for 1% perturbation mutation."
+
+  - id: vision_compression
+    label: "Hardcoded 256-to-4 retina compression before brain input"
+    status: exploring
+    depends_on:
+      - id: iron_maiden_brain
+        why: "The minimal brain needs compressed inputs — 256 raw pixels would require thousands of weights"
+    note: "4 signals: food_dir_x, food_dir_y, food_proximity, obstacle_ahead. Hardcoded initially, evolvable in Phase 5+."
+
+  - id: gentle_mutation
+    label: "Mutation uses 1% perturbations instead of full-range replacement"
+    status: decided
+    depends_on:
+      - id: iron_maiden_brain
+        why: "With only 83 parameters, a single full-range replacement destroys learned circuits"
+      - id: first_milestone
+        why: "Gentle mutation enables gradual hill-climbing — prerequisite for visible progress in 10 minutes"
+    note: "Slight perturbation is primary mutation mode. Full replacement near-eliminated (weight 5 vs 200)."
