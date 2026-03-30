@@ -12,8 +12,6 @@ Key structural problems in the current code:
 | Problem | Where | Impact |
 |---------|-------|--------|
 | 256 raw RGBA retina inputs into random synapses | `vision_system.cpp` | No spatial structure preserved → noise for the network |
-| No per-tick energy cost | `critter_system.cpp:108-139` | A still-standing critter lives exactly as long as an active one |
-| Death is age-only (18 000 frames) | `critter_system.cpp:139` | No selection pressure for any behaviour at all |
 | `eat` motor must fire AND collision must happen | `plugin.cpp:368-397` | AND-gate over two independently hard problems |
 | "Alter Weight" replaces with full-range random value | `brain_system.cpp` mutation table | Destroys whatever the network had learned |
 | Initial brain: 50-100 random neurons, random wiring | `brain_system.cpp` | Near-zero chance of producing coordinated movement |
@@ -22,10 +20,9 @@ Key structural problems in the current code:
 
 1. **Give locomotion for free** — the brain modulates, not generates.
 2. **Compress vision before the brain** — fixed preprocessing, 4 signals not 256.
-3. **Make standing still costly** — per-tick energy drain.
-4. **Simplify eating initially** — contact = eat, no motor gate.
-5. **Mutate gently** — small perturbations, not replacements.
-6. **Bootstrap in phases** — each phase builds on a working previous stage.
+3. **Simplify eating initially** — contact = eat, no motor gate.
+4. **Mutate gently** — small perturbations, not replacements.
+5. **Bootstrap in phases** — each phase builds on a working previous stage.
 
 ---
 
@@ -137,27 +134,7 @@ This is small enough that gentle mutation can explore it in reasonable time.
 
 ---
 
-## Module 4: Metabolic Pressure
-
-### Energy drain per tick
-```cpp
-// in critter_system.cpp process(), after age increment:
-critter_unit->setEnergy( critter_unit->energy() - m_energy_cost_per_tick->get_float() );
-```
-
-Default: **0.1 energy/tick**.  At 1500 starting energy, a still critter dies after
-15 000 ticks (before max age of 18 000).  A critter that eats even occasionally
-survives longer.
-
-### Why this matters
-Without metabolic cost, the fitness landscape is completely flat — every critter
-lives the same 18 000 frames regardless of behaviour.  There is literally no
-selection signal for food-seeking.  This single change creates the minimal
-gradient that evolution needs.
-
----
-
-## Module 5: Gentler Mutation
+## Module 4: Gentler Mutation
 
 ### Changes to mutation parameters
 
@@ -181,7 +158,6 @@ gradual hill-climbing on the fitness landscape.
 ### Phase 1 — Validate CPG
 - CPG drives all hinges, brain disconnected
 - Essen automatisch bei Kontakt (kein `eat`-Motor nötig)
-- Energy drain aktiv
 - **Ziel**: Kritter laufen sichtbar, Physik stabil
 - **Erfolgskriterium**: Kritter bewegen sich durch die Welt, kein Absturz
 
@@ -189,7 +165,7 @@ gradual hill-climbing on the fitness landscape.
 - Brain-Outputs `speed` und `turn` modulieren CPG
 - Vision noch deaktiviert (konstante Dummy-Werte)
 - Essen weiterhin automatisch
-- **Ziel**: Evolution entdeckt "Bewegung = länger leben"
+- **Ziel**: Evolution entdeckt, dass Bewegung die Chance auf Futter und Reproduktion erhoeht
 - **Erfolgskriterium**: Nach N Generationen bewegen sich Kritter mehr als zufällig
 
 ### Phase 3 — Vision aktiv
@@ -223,7 +199,7 @@ src/plugins/be_plugin_app_critterding/
 
 ### Geänderte Dateien
 ```
-critter_system.cpp   — Energy drain, brain type switch, CPG integration
+critter_system.cpp   — Brain type switch, CPG integration
 vision_system.cpp    — Compression step after pixel readback
 plugin.cpp           — Phase flags, optional eat-auto mode
 body_system.cpp      — CPG parameter loading from body plan JSON
@@ -283,6 +259,3 @@ Ansatz, muss aber angepasst werden:
 2. **Futter-Farbe**: Ist Futter immer grün gerendert?  Die Vision-Kompression
    hängt davon ab.  Falls nicht, muss ein anderes Merkmal verwendet werden
    (z.B. Helligkeit/Größe).
-3. **Fortpflanzungsschwelle**: Bei 2501 Energie und 1500 Start muss ein Kritter
-   mindestens 1001 Energie essen bevor er sich fortpflanzen kann.  Mit 0.1/tick
-   Drain sind das ~10 Futterstücke.  Ist das realistisch?
