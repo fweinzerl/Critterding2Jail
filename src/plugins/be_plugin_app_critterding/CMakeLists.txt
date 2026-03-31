@@ -18,6 +18,8 @@
 		species_system.h
 		critter_system.cpp
 		critter_system.h
+		cpg_system.cpp
+		cpg_system.h
 		control_panel.cpp
 		control_panel.h
 		life_stats_panel.cpp

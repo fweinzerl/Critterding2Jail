@@ -369,8 +369,8 @@
 		// DEPTHMAP VIEWER
 			t_graphicsModelSystem->addChild("DepthMapViewer", "DepthMapViewer");
 
-		// VISION SYSTEM
-			auto vision_system = addChild( "vision_system", "CdVisionSystem" );
+		// VISION SYSTEM (disabled for CPG Phase 1)
+			// auto vision_system = addChild( "vision_system", "CdVisionSystem" );
   			// addChild("GLSwapBuffers", "GLSwapBuffers")->set("set_glwindow", glwindow);
 
 		// CRITTER SYSTEM
@@ -378,7 +378,7 @@
 			m_critter_unit_container = critter_system->getChild( "unit_container", 1 );
 
 		// REGISTER UNIT CONTAINER IN VISION SYSTEM
-			vision_system->set("register_container", m_critter_unit_container);
+			// vision_system->set("register_container", m_critter_unit_container);
 
 		// FOOD SYSTEM
 			auto food_system = addChild( "food_system", new CdFoodSystem() );

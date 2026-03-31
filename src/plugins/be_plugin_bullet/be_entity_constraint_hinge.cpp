@@ -50,45 +50,32 @@
 	void BConstraintHinge::process(  )
 	{
 		// std::cout << "BConstraintHinge::process" << std::endl;
-		if ( m_hinge && m_input_sum != 0.0f )
+		if ( m_hinge )
 		{
 			// std::cout << "input sum = " << m_input_sum << std::endl;
 			
-			// float max_input_sum = 0.38f; // FIXME MAKE OPTION
-			// float max_input_sum = 0.42f; // FIXME MAKE OPTION
-			float max_input_sum = 0.23f; // FIXME MAKE OPTION
-			if ( m_input_sum > max_input_sum )
-			{
-				m_input_sum = max_input_sum;
-			}
-			else if ( m_input_sum < -max_input_sum )
-			{
-				m_input_sum = -max_input_sum;
-			}
-			
-			m_direction = 0.025f;
-			
-			if ( m_bidirectional->get_bool() )
-			{
-				if ( m_input_sum < 0.0f )
-				{
-					m_direction = -m_direction;
-					m_input_sum *= -1.0f;
-				}
-			}
-			else // ONLY PERFORM NEGATIVE VALUES
-			{
-				if ( m_input_sum > 0.0f )
-				{
-					m_input_sum = 0.0f;
-				}
-			}
-			
-			if ( m_input_sum != 0.0f )
-			{
-				m_hinge->enableAngularMotor(true, m_direction, m_input_sum );  // 5000.0f
-				m_input_sum = 0.0f;
-			}
+			// target angle from input, P-controller computes velocity
+			float target_angle = m_input_sum;
+			float current_angle = m_hinge->getHingeAngle();
+			float error = target_angle - current_angle;
+			float gain = 5.0f;
+			float velocity = error * gain;
+
+			// clamp velocity
+			if ( velocity > 2.0f ) velocity = 2.0f;
+			else if ( velocity < -2.0f ) velocity = -2.0f;
+
+			// debug: log first constraint's input each frame
+			static unsigned int dbg_hinge_frame = 0;
+			static BConstraintHinge* dbg_hinge_ptr = 0;
+			if ( dbg_hinge_ptr == 0 ) dbg_hinge_ptr = this;
+			if ( this == dbg_hinge_ptr && (dbg_hinge_frame % 20 == 0) )
+				std::cout << "hinge[0] frame=" << dbg_hinge_frame << " target=" << target_angle << " angle=" << current_angle << " vel=" << velocity << std::endl;
+			if ( this == dbg_hinge_ptr ) ++dbg_hinge_frame;
+
+			float max_impulse = 0.23f;
+			m_hinge->enableAngularMotor(true, velocity, max_impulse);
+			m_input_sum = 0.0f;
 			
 			// ANGLE
 				// float percentAngle = (m_hinge->getHingeAngle() + m_diffFromZero) / m_fullRange;
