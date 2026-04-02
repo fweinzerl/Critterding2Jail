@@ -21,7 +21,26 @@
 - Brain: spiking neural network (`be_plugin_brainz`), being supplemented by Iron Maiden (feedforward, CPG-based).
 - Two runtime modes: single-thread (`app_critterding`) and multi-thread (`app_critterding_threads`).
 
+## Build
+- `compile-release.sh` — clean release build (`-Ofast`), deletes CMakeCache.
+- `compile-debug.sh` — debug build with `-fsanitize=address`.
+- Known ASan ODR violation (`condenseWhiteSpace` in kernel/bullet tinyxml) — pre-existing, bypass with `ASAN_OPTIONS=detect_odr_violation=0`.
+
+## Iron Maiden — Current State
+- **Phase 1 (CPG) done.** Critters walk with pure sinusoidal CPG, no brain.
+- CPG system: `cpg_system.h/.cpp` — drives hinges via `constraint->set(signal)`.
+- When CPG enabled: brain creation, vision system, and lifetime learning are skipped entirely.
+- Vision system disabled in `plugin.cpp` (commented out) for CPG phases.
+- Oscillator code (from ai_codex branch) removed — will be rebuilt cleanly later.
+
+## Bullet Hinge Motor — Key Insight
+- `enableAngularMotor(enable, targetVelocity, maxMotorImpulse)` is **persistent** — keeps running until explicitly changed/disabled.
+- Constraint `process()` now uses P-controller: input = target angle, velocity = error * gain, fixed max impulse.
+- Hinge limits enforce range — no need for bidirectional sign filter with P-controller.
+- Old approach (input as force, fixed velocity) caused gravity-drift. Don't revert to that.
+
 ## Planning Documents
 - `ROADMAP.md` — Long-term vision (predator-prey ecosystem) + observability/tooling tasks.
 - `PLAN_IRON_MAIDEN.md` — Brain/evolution/emergence plan (CPG, vision compression, minimal brain, phased bootstrapping).
+- `decisions.yaml` — Decision DAG tracking feature status.
 - Superseded: `PLAN_JAIL_BRAIN.md`, `TODO.md`, `code-style.md` (from `ai_codex` branch).

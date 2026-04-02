@@ -72,7 +72,7 @@ nodes:
   # ── Locomotion ───────────────────────────────────────────────────────
   - id: cpg
     label: "Central Pattern Generator provides rhythmic locomotion without brain involvement"
-    status: open
+    status: done
     depends_on:
       - id: mechanical_locomotion
         why: "CPG gives locomotion for free — the brain modulates rather than generates movement"

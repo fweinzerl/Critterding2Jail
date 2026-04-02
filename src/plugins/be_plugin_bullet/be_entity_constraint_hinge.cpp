@@ -65,14 +65,6 @@
 			if ( velocity > 2.0f ) velocity = 2.0f;
 			else if ( velocity < -2.0f ) velocity = -2.0f;
 
-			// debug: log first constraint's input each frame
-			static unsigned int dbg_hinge_frame = 0;
-			static BConstraintHinge* dbg_hinge_ptr = 0;
-			if ( dbg_hinge_ptr == 0 ) dbg_hinge_ptr = this;
-			if ( this == dbg_hinge_ptr && (dbg_hinge_frame % 20 == 0) )
-				std::cout << "hinge[0] frame=" << dbg_hinge_frame << " target=" << target_angle << " angle=" << current_angle << " vel=" << velocity << std::endl;
-			if ( this == dbg_hinge_ptr ) ++dbg_hinge_frame;
-
 			float max_impulse = 0.23f;
 			m_hinge->enableAngularMotor(true, velocity, max_impulse);
 			m_input_sum = 0.0f;
