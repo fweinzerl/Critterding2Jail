@@ -1,23 +1,29 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 class BEntity;
 class CdCritter;
 
-struct CpgHingeConfig
-{
-	unsigned int hinge_index;
-	float phase;
-	float max_amplitude;
-	float turn_gain;
-};
-
-struct CpgConfig
+// Evolvable CPG parameters — symmetric (left = mirror of right).
+struct CpgEvolvableParams
 {
 	float frequency;
-	std::vector<CpgHingeConfig> hinges;
+	float shoulder_amplitude;
+	float elbow_amplitude;
+	float elbow_phase;       // elbow offset relative to shoulder
+	float side_phase_offset; // left side offset relative to right (pi = alternating)
+};
+
+// Structural layout — fixed per body plan, not evolvable.
+struct CpgSymmetricLayout
+{
+	unsigned int right_shoulder;
+	unsigned int right_elbow;
+	unsigned int left_shoulder;
+	unsigned int left_elbow;
+	float shoulder_turn_gain;
+	float elbow_turn_gain;
 };
 
 // Central Pattern Generator — drives hinge constraints with rhythmic signals.
@@ -32,14 +38,16 @@ public:
 	bool loadConfig(const std::string& body_plan_path);
 
 	bool enabled() const { return m_enabled; }
-	const CpgConfig& config() const { return m_config; }
+	const CpgEvolvableParams& defaultParams() const { return m_default_params; }
 
 	// Apply one tick of CPG output to a critter's constraints.
-	// cpg_phase is the critter's accumulated phase (updated in place).
-	// speed: 0..1, turn: -1..1 (Phase 1: fixed 1.0 and 0.0).
-	void update(CdCritter* critter, float& cpg_phase, float speed, float turn);
+	void update(CdCritter* critter, float& cpg_phase, const CpgEvolvableParams& params, float speed, float turn);
+
+	// Small perturbation on evolvable params. rng is the project's BEntity RNG.
+	void mutate(CpgEvolvableParams& params, BEntity* rng) const;
 
 private:
 	bool m_enabled;
-	CpgConfig m_config;
+	CpgEvolvableParams m_default_params;
+	CpgSymmetricLayout m_layout;
 };

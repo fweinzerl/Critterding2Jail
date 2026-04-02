@@ -226,8 +226,8 @@ namespace
 					}
 
 					total_energy_in_entities += critter_unit->energy();
-					// Phase 1: fixed speed=1, turn=0, no brain control
-					m_cpg_system.update( critter_unit, critter_unit->m_cpg_phase, 1.0f, 0.0f );
+					// CPG: fixed speed=1, turn=0 (brain control comes later)
+					m_cpg_system.update( critter_unit, critter_unit->m_cpg_phase, critter_unit->m_cpg_params, 1.0f, 0.0f );
 					// critter_unit->m_always_firing_input->onUpdate();
 				}
 			}
@@ -285,7 +285,10 @@ namespace
 					if ( critter_unit->energy() >= m_procreate_minimum_energy->get_float() )
 					{
 						auto procreate = critter_unit->getChild( "motor_neurons", 1)->getChild( "procreate", 1);
-						
+						// CPG mode: auto-procreate when energy is sufficient
+						if ( m_cpg_system.enabled() )
+							procreate->set(1.0f);
+
 						// FIXME SHOULD THIS BE IsFiring? TURNS OUT THIS ARE FLOATS and not motor neurons
 						if ( procreate->get_float() != 0.0f )
 						// if ( dynamic_cast<BNeuron*>(procreate)->m_firing->get_bool() )
@@ -318,6 +321,8 @@ namespace
 						auto critter_unit = new CdCritter();
 						m_unit_container->addChild( "critter_unit", critter_unit );
 						critter_unit->setEnergy( m_intitial_energy->get_float() );
+						if ( m_cpg_system.enabled() )
+							critter_unit->m_cpg_params = m_cpg_system.defaultParams();
 						resetLearningState( critter_unit );
 						m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
 
@@ -489,9 +494,17 @@ namespace
 				}
 			}
 
-				// MUTATE CRITTER BRAIN (only when brain exists)
-				if ( !m_cpg_system.enabled() )
+				if ( m_cpg_system.enabled() )
 				{
+					// CPG mode: inherit and mutate CPG params
+					critter_new->m_cpg_params = critter_unit->m_cpg_params;
+					m_cpg_system.mutate( critter_new->m_cpg_params, m_rng );
+					auto ad = critter_new->getChild( "adam_distance", 1 );
+					ad->set( ad->get_uint() + 1 );
+				}
+				else
+				{
+					// Brain mode: mutate brain
 					BEntity* brain_new = 0;
 					for_all_children_of3( critter_new )
 					{
