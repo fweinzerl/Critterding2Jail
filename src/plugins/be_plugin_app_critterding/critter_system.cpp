@@ -322,7 +322,10 @@ namespace
 						m_unit_container->addChild( "critter_unit", critter_unit );
 						critter_unit->setEnergy( m_intitial_energy->get_float() );
 						if ( m_cpg_system.enabled() )
+						{
 							critter_unit->m_cpg_params = m_cpg_system.defaultParams();
+							critter_unit->m_body_params = m_cpg_system.defaultBodyParams();
+						}
 						resetLearningState( critter_unit );
 						m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
 
@@ -342,6 +345,10 @@ namespace
 						// REFERENCE TO EXTERNAL CHILD
 							critter_unit->addChild( "external_body", new BEntity_external() )->set( newBody );
 							refreshBodyShortcuts( critter_unit );
+
+						// apply per-critter hinge limits
+						if ( m_cpg_system.enabled() )
+							m_cpg_system.applyBodyParams( critter_unit, critter_unit->m_body_params );
 
 					// BRAIN (skipped when CPG drives locomotion)
 					if ( !m_cpg_system.enabled() )
@@ -496,9 +503,12 @@ namespace
 
 				if ( m_cpg_system.enabled() )
 				{
-					// CPG mode: inherit and mutate CPG params
+					// CPG mode: inherit and mutate CPG + body params
 					critter_new->m_cpg_params = critter_unit->m_cpg_params;
+					critter_new->m_body_params = critter_unit->m_body_params;
 					m_cpg_system.mutate( critter_new->m_cpg_params, m_rng );
+					m_cpg_system.mutateBody( critter_new->m_body_params, m_rng );
+					m_cpg_system.applyBodyParams( critter_new, critter_new->m_body_params );
 					auto ad = critter_new->getChild( "adam_distance", 1 );
 					ad->set( ad->get_uint() + 1 );
 				}

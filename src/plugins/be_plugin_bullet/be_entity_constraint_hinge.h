@@ -21,6 +21,7 @@ class btHingeConstraint;
 		void construct();
 		void process();
 		bool set( const Bstring& id, const Bbool& value );
+		bool set( const Bstring& id, const Bfloat& value );
 
 		// void			motorate();
 		float			getAngle();

@@ -90,6 +90,31 @@
 		}
 	}
 
+	bool BConstraintHinge::set( const Bstring& id, const Bfloat& value )
+	{
+		if ( !m_hinge ) return false;
+
+		if ( id == "limit_low" )
+		{
+			getChild( "limit_low", 1 )->set( value );
+			m_hinge->setLimit( value, getChild( "limit_high", 1 )->get_float(),
+			                   getChild( "softness", 1 )->get_float(),
+			                   getChild( "biasfactor", 1 )->get_float(),
+			                   getChild( "relaxationfactor", 1 )->get_float() );
+			return true;
+		}
+		if ( id == "limit_high" )
+		{
+			getChild( "limit_high", 1 )->set( value );
+			m_hinge->setLimit( getChild( "limit_low", 1 )->get_float(), value,
+			                   getChild( "softness", 1 )->get_float(),
+			                   getChild( "biasfactor", 1 )->get_float(),
+			                   getChild( "relaxationfactor", 1 )->get_float() );
+			return true;
+		}
+		return false;
+	}
+
 	// WIRE UP THE HINGE
 	bool BConstraintHinge::set( const Bstring& id, const Bbool& value )
 	{

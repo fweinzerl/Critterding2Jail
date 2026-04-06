@@ -5,6 +5,15 @@
 #include "cpg_system.h"
 #include <limits>
 
+// Evolvable body parameters — symmetric (left = right).
+struct BodyEvolvableParams
+{
+	float shoulder_limit_low;
+	float shoulder_limit_high;
+	float elbow_limit_low;
+	float elbow_limit_high;
+};
+
 	class CdSpeciesSystem;
 	class BeRigidBody;
 	class BMousePicker;
@@ -86,7 +95,7 @@
 						  m_learning_episode_tick_entity(0), m_learning_episode_reward_entity(0),
 					  m_learning_best_episode_reward_entity(0), m_learning_last_reward_entity(0), m_learning_last_green_entity(0),
 					  m_body_root_shortcut(0), m_constraints_shortcut(0), m_transform_shortcut(0), m_physics_component_shortcut(0), m_bodyparts_shortcut(0),
-					  m_cpg_phase(0.0f), m_cpg_params{0.0f, 0.0f, 0.0f, 0.0f, 0.0f},
+					  m_cpg_phase(0.0f), m_cpg_params{0.0f, 0.0f, 0.0f, 0.0f, 0.0f}, m_body_params{0.0f, 0.0f, 0.0f, 0.0f},
 					  m_age(0), m_energy(0), m_species(0)
 				{
 				};
@@ -123,6 +132,7 @@
 				BEntity* m_bodyparts_shortcut;
 				float m_cpg_phase;
 				CpgEvolvableParams m_cpg_params;
+				BodyEvolvableParams m_body_params;
 				// BEntity* m_always_firing_input;
 		private:
 				// PROPERTIES

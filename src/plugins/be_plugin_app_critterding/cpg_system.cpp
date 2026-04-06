@@ -86,6 +86,7 @@ namespace
 CpgSystem::CpgSystem()
 	: m_enabled(false)
 	, m_default_params{0.0f, 0.0f, 0.0f, 0.0f, 0.0f}
+	, m_default_body_params{0.0f, 0.0f, 0.0f, 0.0f}
 	, m_layout{0, 0, 0, 0, 0.0f, 0.0f}
 {
 }
@@ -132,10 +133,26 @@ bool CpgSystem::loadConfig(const std::string& body_plan_path)
 		std::exit(1);
 	}
 
+	// body evolvable params: read limits from right-side hinges (symmetric reference)
+	auto rs = std::to_string(m_layout.right_shoulder);
+	auto re = std::to_string(m_layout.right_elbow);
+	ok = true;
+	ok = ok && json_float(text, "hinge_" + rs + "_limit_low", m_default_body_params.shoulder_limit_low);
+	ok = ok && json_float(text, "hinge_" + rs + "_limit_high", m_default_body_params.shoulder_limit_high);
+	ok = ok && json_float(text, "hinge_" + re + "_limit_low", m_default_body_params.elbow_limit_low);
+	ok = ok && json_float(text, "hinge_" + re + "_limit_high", m_default_body_params.elbow_limit_high);
+	if ( !ok )
+	{
+		std::cerr << "ERROR: cpg_system: hinge limit keys incomplete for body evolution" << std::endl;
+		std::exit(1);
+	}
+
 	m_enabled = true;
 	std::cout << "cpg_system: loaded symmetric config, frequency=" << m_default_params.frequency
 	          << " shoulder_amp=" << m_default_params.shoulder_amplitude
-	          << " elbow_amp=" << m_default_params.elbow_amplitude << std::endl;
+	          << " elbow_amp=" << m_default_params.elbow_amplitude
+	          << " shoulder_limits=[" << m_default_body_params.shoulder_limit_low << "," << m_default_body_params.shoulder_limit_high << "]"
+	          << " elbow_limits=[" << m_default_body_params.elbow_limit_low << "," << m_default_body_params.elbow_limit_high << "]" << std::endl;
 	return true;
 }
 
@@ -212,4 +229,69 @@ void CpgSystem::mutate(CpgEvolvableParams& params, BEntity* rng) const
 
 	params.elbow_phase = wrap_phase(params.elbow_phase + delta(0.15f));
 	params.side_phase_offset = wrap_phase(params.side_phase_offset + delta(0.15f));
+}
+
+void CpgSystem::applyBodyParams(CdCritter* critter, const BodyEvolvableParams& params)
+{
+	if ( !m_enabled || critter == 0 ) return;
+	auto constraints = critter->m_constraints_shortcut;
+	if ( constraints == 0 ) return;
+	const auto& cc = constraints->children();
+
+	// shoulder limits (both sides)
+	unsigned int shoulder_indices[] = { m_layout.right_shoulder, m_layout.left_shoulder };
+	for ( auto idx : shoulder_indices )
+	{
+		if ( idx < cc.size() )
+		{
+			auto c = cc[idx]->get_reference();
+			if ( c )
+			{
+				c->set( "limit_low", params.shoulder_limit_low );
+				c->set( "limit_high", params.shoulder_limit_high );
+			}
+		}
+	}
+
+	// elbow limits (both sides)
+	unsigned int elbow_indices[] = { m_layout.right_elbow, m_layout.left_elbow };
+	for ( auto idx : elbow_indices )
+	{
+		if ( idx < cc.size() )
+		{
+			auto c = cc[idx]->get_reference();
+			if ( c )
+			{
+				c->set( "limit_low", params.elbow_limit_low );
+				c->set( "limit_high", params.elbow_limit_high );
+			}
+		}
+	}
+}
+
+void CpgSystem::mutateBody(BodyEvolvableParams& params, BEntity* rng) const
+{
+	if ( rng == 0 ) return;
+
+	auto delta = [rng](float max_delta) -> float {
+		rng->set( "min", Bint(-100) );
+		rng->set( "max", Bint(100) );
+		return max_delta * (0.01f * rng->get_int());
+	};
+
+	params.shoulder_limit_low += delta(0.05f);
+	if ( params.shoulder_limit_low < -1.5f ) params.shoulder_limit_low = -1.5f;
+	if ( params.shoulder_limit_low > 0.0f ) params.shoulder_limit_low = 0.0f;
+
+	params.shoulder_limit_high += delta(0.05f);
+	if ( params.shoulder_limit_high < 0.0f ) params.shoulder_limit_high = 0.0f;
+	if ( params.shoulder_limit_high > 1.5f ) params.shoulder_limit_high = 1.5f;
+
+	params.elbow_limit_low += delta(0.05f);
+	if ( params.elbow_limit_low < -0.5f ) params.elbow_limit_low = -0.5f;
+	if ( params.elbow_limit_low > 0.0f ) params.elbow_limit_low = 0.0f;
+
+	params.elbow_limit_high += delta(0.05f);
+	if ( params.elbow_limit_high < 0.0f ) params.elbow_limit_high = 0.0f;
+	if ( params.elbow_limit_high > 1.5f ) params.elbow_limit_high = 1.5f;
 }
