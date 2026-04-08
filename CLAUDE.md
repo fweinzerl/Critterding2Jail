@@ -20,6 +20,7 @@
 - Plugin-based architecture (`be_plugin_*`).
 - Brain: spiking neural network (`be_plugin_brainz`), being supplemented by Iron Maiden (feedforward, CPG-based).
 - Two runtime modes: single-thread (`app_critterding`) and multi-thread (`app_critterding_threads`).
+- Known issue: threaded mode crashes in debug builds with ImGui assertion (NewFrame/EndFrame race condition). ImGui is not thread-safe. Use single-thread mode for debugging.
 
 ## Build
 - `compile-release.sh` — clean release build (`-Ofast`), deletes CMakeCache.
