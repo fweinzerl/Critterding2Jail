@@ -235,7 +235,7 @@
 
 					// check commands
 
-					// FIXME WHEN HAMMERING "R" (REMOVE) IN ADMIN (IN VALGRIND) WE CAN MAKE IT CRASH HERE, SINCE c WAS REPLACED ABOVE WITH A REFERENCE THAT'S GONE?
+					// after a "remove" command, the buffer is cleared and we return (see below)
 					if ( c->name() == "commitValue" )
 					{
 						// std::cout << c->get_reference()->name() << std::endl;
@@ -258,14 +258,13 @@
 					{
 						auto pass_entity = c->get_reference();
 						auto command = c->getChild("command", 1);
-						
+
 						BEntity_string* cmd_string = dynamic_cast<BEntity_string*>( command );
 						if ( cmd_string )
 						{
 							auto entity = command->getChild("entity", 1);
 							if ( !entity || is_not_in_removed_entities( entity->get_reference() ) )
 							{
-								// std::cout << "  target: " << pass_entity->name() << " command: " << cmd_string->get_string() << std::endl;
 								pass_entity->set( cmd_string->get_string(), command );
 							}
 						}
@@ -273,12 +272,8 @@
 
 					else if ( c->name() == "remove" )
 					{
-						// std::cout << "BEntityTop::process_and_clear_command_buffer::command remove " << std::endl;
-						// get reference
 						auto entity = c->get_reference();
-						
-						// FIXME DOES NOT CATCH MIGRATED CRITTERS: SO DO THE CHECKS AT INPUTTING TO THE COMMAND BUFFER
-						// if it was already removed earlier, do nothing
+
 						if ( is_not_in_removed_entities( entity ) )
 						{
 							m_removed_entities.push_back( entity );
@@ -286,12 +281,13 @@
 							{
 								if ( entity != m_command_buffer && entity->name() != "lib" )
 								{
-									// std::cout << "removing: " << entity->id() << std::endl;
 									entity->parent()->removeChild(entity);
-								}
-								else 
-								{
-									// std::cout << "best not removed: " << entity->id() << std::endl;
+
+									// cascading delete may have invalidated references in remaining commands
+									while ( m_command_buffer->hasChildren() )
+										m_command_buffer->removeChild( m_command_buffer->children()[0] );
+									m_removed_entities.clear();
+									return;
 								}
 							}
 						}
