@@ -40,9 +40,9 @@
 			auto critter_system = addChild( "critter_system", "CdCritterSystem" );
 			m_critter_unit_container = critter_system->getChild( "unit_container", 1 );
 
-			// REGISTER UNIT CONTAINER IN VISION SYSTEM
-			auto vision_system = parent()->parent()->getChild( "vision_system", 1 );
-				vision_system->set( "register_container", m_critter_unit_container );
+			// REGISTER UNIT CONTAINER IN VISION SYSTEM (disabled for CPG phases)
+			// auto vision_system = parent()->parent()->getChild( "vision_system", 1 );
+			// 	vision_system->set( "register_container", m_critter_unit_container );
 		}
 
 		// BULLET PHYSICS
@@ -419,8 +419,8 @@
 			t_graphicsModelSkyDome->set("filename", "../share/modules/skydome3.obj");
 		}
 
-		// VISION SYSTEM
-			auto vision_system = addChild( "vision_system", "CdVisionSystem" );
+		// VISION SYSTEM (disabled for CPG phases — no brain to consume vision data)
+			// auto vision_system = addChild( "vision_system", "CdVisionSystem" );
 			// addChild("GLSwapBuffers", "GLSwapBuffers")->set("set_glwindow", glwindow);
 
 		// DEPTHMAP VIEWER

@@ -1,4 +1,5 @@
 #include "critter_system.h"
+#include "body_plan_config.h"
 #include "kernel/be_entity_core_types.h"
 #include "body_runtime_access.h"
 // #include "species_system.h"
@@ -213,10 +214,12 @@ namespace
 				{
 					critter_unit->setAge( 1+critter_unit->age() );
 
-					// eat activation cost: penalize keeping eat output high
+					// eat: auto-eat in CPG mode, penalize active eat otherwise
 					auto eat = critter_unit->getChild("motor_neurons", 1)->getChild("eat", 1);
 					if ( eat )
 					{
+						if ( m_cpg_system.enabled() )
+							eat->set(1.0f);
 						float eat_value = eat->get_float();
 						if ( eat_value > 0.0f )
 						{
@@ -346,10 +349,6 @@ namespace
 							critter_unit->addChild( "external_body", new BEntity_external() )->set( newBody );
 							refreshBodyShortcuts( critter_unit );
 
-						// apply per-critter hinge limits
-						if ( m_cpg_system.enabled() )
-							m_cpg_system.applyBodyParams( critter_unit, critter_unit->m_body_params );
-
 					// BRAIN (skipped when CPG drives locomotion)
 					if ( !m_cpg_system.enabled() )
 					{
@@ -427,8 +426,22 @@ namespace
 			// critter_unit->setEnergy( critter_unit->energy() / 2 );
 			// critter_unit->setAge( Buint(0) );
 			
-			// COPY CRITTER
+			// COPY CRITTER — for CPG mode, set body override before copy
+				BodyPlanConfig child_body_cfg;
+				BodyEvolvableParams child_body_params;
+				if ( m_cpg_system.enabled() )
+				{
+					child_body_params = critter_unit->m_body_params;
+					m_cpg_system.mutateBody( child_body_params, m_rng );
+					m_cpg_system.expandBodyParams( child_body_params, child_body_cfg );
+					cd_body_plan_set_override( &child_body_cfg );
+				}
 				auto critter_new = dynamic_cast<CdCritter*>( m_entityCopy.copyEntity( critter_unit ) );
+				if ( m_cpg_system.enabled() )
+				{
+					cd_body_plan_set_override( nullptr );
+					critter_new->m_body_params = child_body_params;
+				}
 				critter_new->getChild( "age", 1 )->set( Buint(0) );
 				refreshBodyShortcuts( critter_new );
 				resetLearningState( critter_new );
@@ -505,10 +518,7 @@ namespace
 				{
 					// CPG mode: inherit and mutate CPG + body params
 					critter_new->m_cpg_params = critter_unit->m_cpg_params;
-					critter_new->m_body_params = critter_unit->m_body_params;
 					m_cpg_system.mutate( critter_new->m_cpg_params, m_rng );
-					m_cpg_system.mutateBody( critter_new->m_body_params, m_rng );
-					m_cpg_system.applyBodyParams( critter_new, critter_new->m_body_params );
 					auto ad = critter_new->getChild( "adam_distance", 1 );
 					ad->set( ad->get_uint() + 1 );
 				}

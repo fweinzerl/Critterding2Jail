@@ -4,6 +4,7 @@
 
 class BEntity;
 class CdCritter;
+struct BodyPlanConfig;
 
 // Evolvable CPG parameters — symmetric (left = mirror of right).
 struct CpgEvolvableParams
@@ -26,7 +27,23 @@ struct CpgSymmetricLayout
 	float elbow_turn_gain;
 };
 
-struct BodyEvolvableParams;
+// Evolvable body dimensions — symmetric (left = right).
+// Scales are half-extents per axis.
+struct BodyEvolvableParams
+{
+	// torso
+	float torso_scale_x;
+	float torso_scale_y;
+	float torso_scale_z;
+	// shoulder joint part (right side, left mirrors)
+	float shoulder_scale_x;
+	float shoulder_scale_y;
+	float shoulder_scale_z;
+	// arm part (right side, left mirrors)
+	float arm_scale_x;
+	float arm_scale_y;
+	float arm_scale_z;
+};
 
 // Central Pattern Generator — drives hinge constraints with rhythmic signals.
 // Also manages symmetric body parameter evolution (shares the hinge layout).
@@ -47,8 +64,8 @@ public:
 	// Apply one tick of CPG output to a critter's constraints.
 	void update(CdCritter* critter, float& cpg_phase, const CpgEvolvableParams& params, float speed, float turn);
 
-	// Apply per-critter hinge limits (symmetric) to constraints.
-	void applyBodyParams(CdCritter* critter, const BodyEvolvableParams& params);
+	// Expand symmetric body params into a full BodyPlanConfig (modifying the default).
+	void expandBodyParams(const BodyEvolvableParams& params, BodyPlanConfig& out) const;
 
 	// Small perturbation on evolvable params. rng is the project's BEntity RNG.
 	void mutate(CpgEvolvableParams& params, BEntity* rng) const;

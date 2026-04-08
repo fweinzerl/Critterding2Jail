@@ -1,4 +1,5 @@
 #include "body_system.h"
+#include "body_plan_config.h"
 #include "kernel/be_entity_core_types.h"
 #include <cctype>
 #include <cstdlib>
@@ -12,55 +13,8 @@
 
 namespace
 {
-	struct BodyPlanPart
-	{
-		std::string name;
-		float offset_x;
-		float offset_y;
-		float offset_z;
-		float scale_x;
-		float scale_y;
-		float scale_z;
-		bool has_friction_override;
-		float friction_override;
-	};
-
-	struct BodyPlanHinge
-	{
-		std::string name;
-		unsigned int part_a;
-		unsigned int part_b;
-		float local_a_x;
-		float local_a_y;
-		float local_a_z;
-		float local_a_pitch;
-		float local_b_x;
-		float local_b_y;
-		float local_b_z;
-		float local_b_pitch;
-		float limit_low;
-		float limit_high;
-		float softness;
-		float biasfactor;
-		float relaxationfactor;
-		bool bidirectional;
-	};
-
-	struct BodyPlanConfig
-	{
-		std::string physics_bodypart_class;
-		std::string graphics_model_name;
-		std::string graphics_mesh_file;
-		bool bodypart_use_density;
-		float bodypart_density;
-		float bodypart_friction;
-		float bodypart_restitution;
-		bool bodypart_wants_deactivation;
-		std::vector<BodyPlanPart> parts;
-		std::vector<BodyPlanHinge> hinges;
-	};
-
 	BodyPlanConfig g_verified_body_plan;
+	const BodyPlanConfig* g_override_body_plan = nullptr;
 
 	void fatal_body_plan_error( const std::string& message );
 
@@ -322,7 +276,17 @@ namespace
 		g_verified_body_plan = cfg;
 	}
 }
- 
+
+void cd_body_plan_set_override(const BodyPlanConfig* cfg)
+{
+	g_override_body_plan = cfg;
+}
+
+const BodyPlanConfig& cd_body_plan_get_active()
+{
+	return g_override_body_plan ? *g_override_body_plan : g_verified_body_plan;
+}
+
 	void BodySystem::construct()
 	{
 		auto settings = addChild( "settings", new BEntity() );
@@ -418,6 +382,7 @@ namespace
 	{
 		auto critter_system = entity_parent->parent()->parent()->parent()->parent();
 		entity_parent->addChild( "bodyparts", new BEntity() );
+		const auto& plan = cd_body_plan_get_active();
 		auto t_constraints = entity_parent->addChild( "constraints", new BEntity() );
 		
 		auto critterding = entity_parent->topParent()->getChild("bin", 1)->getChild( "Critterding", 1 );
@@ -433,7 +398,6 @@ namespace
 
 		auto physics_world = critter_system->parent()->getChild( "physicsworld", 1 );
 		auto settings = entity_parent->parent()->parent()->parent()->getChild( "settings", 1 );
-		const auto& plan = g_verified_body_plan;
 		auto dropzone = critter_system->getChild( "settings", 1 )->getChild( "dropzone", 1 );
 
 		// SPAWN BASE POSITION
