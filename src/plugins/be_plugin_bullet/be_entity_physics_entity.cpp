@@ -102,8 +102,8 @@
 
 		void BPhysicsEntity::construct() // FIME not BEntity::construct, name conflict, can be removed
 		{
-			auto filename = addChild( "filename", new BEntity_string_property() );
-			auto transform = addChild( "transform", new transformEmitter() );
+			addChild( "filename", new BEntity_string_property() );
+			addChild( "transform", new transformEmitter() );
 		}
 
 		Bbool BPhysicsEntity::get_bool( const Bstring& id )

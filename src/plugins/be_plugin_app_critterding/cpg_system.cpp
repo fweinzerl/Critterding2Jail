@@ -87,7 +87,7 @@ namespace
 CpgSystem::CpgSystem()
 	: m_enabled(false)
 	, m_default_params{0.0f, 0.0f, 0.0f, 0.0f, 0.0f}
-	, m_default_body_params{0.0f, 0.0f, 0.0f, 0.0f}
+	, m_default_body_params{0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}
 	, m_layout{0, 0, 0, 0, 0.0f, 0.0f}
 {
 }

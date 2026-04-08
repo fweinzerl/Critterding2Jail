@@ -82,6 +82,7 @@
 				setText(s);
 				return true;
 			}
+			return false;
 		}
 		
 

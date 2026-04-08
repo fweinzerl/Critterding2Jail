@@ -649,7 +649,7 @@
 
 				do_times(1)
 				{
-					auto vk2 = addChild( "VulkanScene LoadModel", "VulkanSceneLoadModel" );
+					addChild( "VulkanScene LoadModel", "VulkanSceneLoadModel" );
 // 					vk2->setFps(144);
 				}
 

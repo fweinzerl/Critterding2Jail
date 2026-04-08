@@ -65,6 +65,7 @@
 
 			void setGeometry( const boost::shared_ptr<BeGeometry>& geometry ) { m_geometry=geometry; }
 
+			using BPhysicsEntity::set;
 			virtual bool set( const Bstring& id, const char* value );
 
 			virtual const char* get_string( const Bstring& id );

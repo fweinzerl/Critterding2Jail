@@ -48,12 +48,6 @@
 		#threadpool/pool_adaptors.hpp
 		#threadpool/pool.hpp
 		
-		tinyxml/tinyxml.cpp
-		tinyxml/tinyxml.h
-		tinyxml/tinystr.cpp
-		tinyxml/tinystr.h
-		tinyxml/tinyxmlparser.cpp
-		tinyxml/tinyxmlerror.cpp
 		
 		graphics/be_buffer.cpp
 		graphics/be_buffer.h

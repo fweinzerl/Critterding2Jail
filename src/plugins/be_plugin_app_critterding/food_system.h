@@ -9,7 +9,7 @@
 		class CdFoodSystem : public BEntity
 		{
 			public:
-				CdFoodSystem() : m_rng(0), m_critter_unit_container(0), m_framecount(0) { setProcessing(); };
+				CdFoodSystem() : m_rng(0), m_framecount(0), m_critter_unit_container(0) { setProcessing(); };
 				const char* class_id() const { return "CdFoodSystem"; }
 				virtual ~CdFoodSystem() {};
 				

@@ -1,5 +1,6 @@
 #include "checkbox.h"
 #include "imgui/imgui.h"
+#include <cstring>
 
 	BImGuiCheckBox::BImGuiCheckBox()
 	: BEntity_bool()
@@ -11,7 +12,7 @@
 
 	void BImGuiCheckBox::process()
 	{
-		if ( parent()->class_id() == "ImGuiHBoxLayout" && parent()->children()[0] != this )
+		if ( std::strcmp(parent()->class_id(), "ImGuiHBoxLayout") == 0 && parent()->children()[0] != this )
 			ImGui::SameLine();
 
 		ImGui::PushID( id() );

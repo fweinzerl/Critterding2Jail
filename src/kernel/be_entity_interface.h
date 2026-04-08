@@ -202,7 +202,7 @@
 
 		// CUSTOM COPY COMMAND
 			public:
-				virtual BEntity* customCopy( BEntity* to_parent, BEntity* entity, std::map<BEntity*, BEntity*>& translation_map ) { return 0; }
+				virtual BEntity* customCopy( BEntity*, BEntity*, std::map<BEntity*, BEntity*>& ) { return 0; }
 
 		// COMMAND BUFFER
 			public:

@@ -397,7 +397,7 @@ const BodyPlanConfig& cd_body_plan_get_active()
 		}
 
 		auto physics_world = critter_system->parent()->getChild( "physicsworld", 1 );
-		auto settings = entity_parent->parent()->parent()->parent()->getChild( "settings", 1 );
+		// auto settings = entity_parent->parent()->parent()->parent()->getChild( "settings", 1 );
 		auto dropzone = critter_system->getChild( "settings", 1 )->getChild( "dropzone", 1 );
 
 		// SPAWN BASE POSITION

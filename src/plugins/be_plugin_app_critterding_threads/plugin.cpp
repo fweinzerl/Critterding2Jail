@@ -131,7 +131,7 @@
 		pluginManager()->load( "qt6", "src/plugins/be_plugin_qt6", "be_plugin_qt6" );
 
 			auto spawner = addChild( "spawner", "QApplicationSpawner" );
-			auto t_parent_to_add_to = spawner->getChildCustom( this );
+			spawner->getChildCustom( this );
 			// auto t_parent_to_add_to = spawner->getChildCustom( parent() );
 			removeChild( spawner );
 
@@ -265,8 +265,8 @@
 			auto launchLifeStatsPanel = commands->addChild( "launchLifeStatsPanel", new cmd_launchLifeStatsPanel() );
 			auto launchSystemMonitor = commands->addChild( "launchSystemMonitor", new cmd_launchSystemMonitor() );
 			auto launchSelectionWindow = commands->addChild( "launchSelectionWindow", new cmd_launchSelectionWindow() );
-			auto mousePickBody = commands->addChild( "mousePickBody", new cmd_mousePickBody() );
-			auto mouseUnpickBody = commands->addChild( "mouseUnpickBody", new cmd_mouseUnpickBody() );
+			commands->addChild( "mousePickBody", new cmd_mousePickBody() );
+			commands->addChild( "mouseUnpickBody", new cmd_mouseUnpickBody() );
 
 		// BINDINGS
 			auto bindings = glwindow->getChild( "bindings", 1 );
@@ -387,8 +387,8 @@
 			auto shaders = t_graphicsModelSystem->addChild( "shaders", "entity" );
 			// auto u_instanceModelMatrixAttrib = shaders->addChild( "InstanceModelMatrix", "ShaderAttrib" );
 			// auto u_instanceScale = shaders->addChild( "InstanceScale", "ShaderAttrib" );
-			auto u_vec4_color = shaders->addChild( "u_Color", "ShaderUniformVec4" );
-			auto u_i14_textureSample = shaders->addChild( "u_textureSample", "ShaderUniformI1" );
+			shaders->addChild( "u_Color", "ShaderUniformVec4" );
+			shaders->addChild( "u_textureSample", "ShaderUniformI1" );
 			shaders->addChild( "e_scale_x", "float" )->set(0.0f);
 			shaders->addChild( "e_scale_y", "float" )->set(0.0f);
 			shaders->addChild( "e_scale_z", "float" )->set(0.0f);
@@ -775,7 +775,7 @@
 				++thread_counter;
 			}
 		}
-		
+		return 0;
 	}
 
 	void Scene::process()

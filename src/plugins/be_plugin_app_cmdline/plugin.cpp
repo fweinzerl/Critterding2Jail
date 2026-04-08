@@ -28,7 +28,7 @@
 
 			auto spawner = addChild( "spawner", "QApplicationSpawner" );
 			// auto t_parent_to_add_to = spawner->getChildCustom( parent() );
-			auto t_parent_to_add_to = spawner->getChildCustom( this );
+			spawner->getChildCustom( this );
 			removeChild( spawner );
 
 		auto bin = topParent()->getChild( "bin", 1 );
@@ -101,7 +101,7 @@
 
 		auto bin = topParent()->getChild( "bin", 1 );
 		auto qt_app = bin->getChild( "QT Application", 2 );
-		auto llama_gui = addChild( "llama_gui", "LLama_gui" );
+		addChild( "llama_gui", "LLama_gui" );
 		
 		// LLAMA LOCATION
 		llama_location = addChild( "llama_location", "string" );

@@ -66,7 +66,7 @@
 
 				auto spawner = addChild( "spawner", "QApplicationSpawner" );
 				// auto t_parent_to_add_to = spawner->getChildCustom( parent() );
-				auto t_parent_to_add_to = spawner->getChildCustom( this );
+				spawner->getChildCustom( this );
 				removeChild( spawner );
 			
 			

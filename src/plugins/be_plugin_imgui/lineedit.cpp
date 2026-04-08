@@ -1,5 +1,6 @@
 #include "lineedit.h"
 #include "groupbox.h"
+#include <cstring>
 #include <iostream>
 #include <sstream>
 #include "imgui/imgui.h"
@@ -7,7 +8,7 @@
 	// STRING
 		void BImGuiLineEdit::process()
 		{
-			if ( parent()->class_id() == "ImGuiHBoxLayout" && parent()->children()[0] != this )
+			if ( std::strcmp(parent()->class_id(), "ImGuiHBoxLayout") == 0 && parent()->children()[0] != this )
 				ImGui::SameLine();
 
 			ImGui::PushID( id() );
@@ -82,7 +83,7 @@
 	// UNSIGNED INT
 		void BImGuiLineEdit_uint::process()
 		{
-			if ( parent()->class_id() == "ImGuiHBoxLayout" && parent()->children()[0] != this )
+			if ( std::strcmp(parent()->class_id(), "ImGuiHBoxLayout") == 0 && parent()->children()[0] != this )
 				ImGui::SameLine();
 
 			ImGui::PushID( id() );
@@ -186,7 +187,7 @@
 	// INT
 		void BImGuiLineEdit_int::process()
 		{
-			if ( parent()->class_id() == "ImGuiHBoxLayout" && parent()->children()[0] != this )
+			if ( std::strcmp(parent()->class_id(), "ImGuiHBoxLayout") == 0 && parent()->children()[0] != this )
 				ImGui::SameLine();
 
 			ImGui::PushID( id() );
@@ -236,7 +237,7 @@
 	// FLOAT
 		void BImGuiLineEdit_float::process()
 		{
-			if ( parent()->class_id() == "ImGuiHBoxLayout" && parent()->children()[0] != this )
+			if ( std::strcmp(parent()->class_id(), "ImGuiHBoxLayout") == 0 && parent()->children()[0] != this )
 				ImGui::SameLine();
 
 			ImGui::PushID( id() );

@@ -130,7 +130,6 @@
 					}
 					else
 					{
-						const GLFWvidmode* mode = glfwGetVideoMode( m_primary_monitor );
 						glfwSetWindowMonitor( m_window, NULL, m_windowed_pos_x, m_windowed_pos_y, m_windowed_width, m_windowed_height, GLFW_DONT_CARE);
 					}
 

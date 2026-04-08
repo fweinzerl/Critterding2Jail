@@ -98,6 +98,7 @@
 // 
 // 				return i;
 // 			}
+		return 0;
 	}
 
 	extern "C" void destroy(BEntity* p)

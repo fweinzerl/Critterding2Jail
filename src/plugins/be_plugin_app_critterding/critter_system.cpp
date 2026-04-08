@@ -277,7 +277,7 @@ namespace
 		// PROCREATE
 // 		if ( 1 == 1 )
 		{
-			static Buint t_highest(0);
+			// static Buint t_highest(0);
 			
 			for_all_children_of2( m_unit_container )
 			{
@@ -335,7 +335,7 @@ namespace
 					// BODY
 						// auto newBody = body_unit_system->addChild( "body", new BBody() );
 						auto newBody = m_body_system_unit_container->addChild( "body", new BEntity() );
-						auto body_root = newBody->addChild( "body", "CdBodyPlan" );
+						newBody->addChild( "body", "CdBodyPlan" );
 						
 						// auto fixed_1 = body_unit_system->addChild( "body_fixed1", "BodyFixed1" );
 						

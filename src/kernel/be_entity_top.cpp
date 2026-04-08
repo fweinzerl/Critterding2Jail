@@ -385,7 +385,7 @@
 									// std::cout << "new timestamp" << new_mod_time << std::endl;
 								}
 									
-								if ( orig_mod_time != orig_mod_time )
+								if ( new_mod_time != orig_mod_time )
 								{
 								// REMOVE LIBRARY
 									auto lib = getChild("lib", 1)->getChild(name.c_str(), 1);

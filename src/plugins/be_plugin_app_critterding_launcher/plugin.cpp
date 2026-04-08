@@ -16,13 +16,13 @@
 		// QT APP
 			pluginManager()->load( "qt6", "src/plugins/be_plugin_qt6", "be_plugin_qt6" );
 			auto spawner = addChild( "spawner", "QApplicationSpawner" );
-			auto t_parent_to_add_to = spawner->getChildCustom( bin );
+			spawner->getChildCustom( bin );
 			removeChild( spawner );
 
 		// ADMIN WINDOW
 			pluginManager()->load( "app_admin_window", "src/plugins/be_plugin_app_admin_window", "be_plugin_app_admin_window" );
 				auto qt_app = bin->getChild( "QT Application", 2 );
-				auto admin_app = qt_app->addChild( "Admin App", "AdminWindow" );
+				qt_app->addChild( "Admin App", "AdminWindow" );
 				// admin_app->set("on_close_destroy_entity", qt_app);
 
 		// SLEEPER

@@ -1,4 +1,5 @@
 #include "pushbutton.h"
+#include <cstring>
 #include <iostream>
 #include <sstream>
 #include "imgui/imgui.h"
@@ -13,7 +14,7 @@
 
 	void BImGuiPushButton::process()
 	{
-		if ( parent()->class_id() == "ImGuiHBoxLayout" && parent()->children()[0] != this )
+		if ( std::strcmp(parent()->class_id(), "ImGuiHBoxLayout") == 0 && parent()->children()[0] != this )
 			ImGui::SameLine();
 
 		ImGui::PushID( id() );

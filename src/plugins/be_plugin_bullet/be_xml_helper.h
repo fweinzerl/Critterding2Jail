@@ -1,7 +1,7 @@
 #ifndef BE_XML_HELPER_H_INCLUDED
 #define BE_XML_HELPER_H_INCLUDED
 
-#include "tinyxml/tinyxml.h"
+#include "kernel/tinyxml/tinyxml.h"
 #include <map>
 // #include <string>
 #include <boost/lexical_cast.hpp>

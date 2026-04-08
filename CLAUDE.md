@@ -24,7 +24,7 @@
 ## Build
 - `compile-release.sh` — clean release build (`-Ofast`), deletes CMakeCache.
 - `compile-debug.sh` — debug build with `-fsanitize=address`.
-- Known ASan ODR violation (`condenseWhiteSpace` in kernel/bullet tinyxml) — pre-existing, bypass with `ASAN_OPTIONS=detect_odr_violation=0`.
+- TinyXML is built once as a shared library (`kernel/tinyxml/`). Plugins use the kernel copy via `"kernel/tinyxml/tinyxml.h"` — no local copies.
 
 ## Iron Maiden — Current State
 - **Phase 1 (CPG) and Phase 2 (symmetric evolution) done.** See `decisions.yaml` for details.

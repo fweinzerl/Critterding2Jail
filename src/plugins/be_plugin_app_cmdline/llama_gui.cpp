@@ -30,7 +30,7 @@
 			auto llama_location_label = hl->addChild( "label_llama_location", "QLabel" );
 			llama_location_label->set( "llama_location" );
 			llama_location_label->set( "width", (Buint)130 );
-			auto llama_location = hl->addChild( "llama_location", "QLineEdit" );
+			hl->addChild( "llama_location", "QLineEdit" );
 		}
 
 		// LAYERS ON GPU
@@ -39,7 +39,7 @@
 			auto layers_on_gpu_label = hl->addChild( "label_layers_on_gpu", "QLabel" );
 			layers_on_gpu_label->set( "layers_on_gpu" );
 			layers_on_gpu_label->set( "width", (Buint)130 );
-			auto layers_on_gpu = hl->addChild( "layers_on_gpu", "QLineEdit_uint" );
+			hl->addChild( "layers_on_gpu", "QLineEdit_uint" );
 		}
 
 		// MODEL LOCATION
@@ -48,7 +48,7 @@
 			auto model_location_label = hl->addChild( "label_model_location", "QLabel" );
 			model_location_label->set( "model_location" );
 			model_location_label->set( "width", (Buint)130 );
-			auto model_location = hl->addChild( "model_location", "QLineEdit" );
+			hl->addChild( "model_location", "QLineEdit" );
 		}
 
 		// CTX_SIZE
@@ -57,7 +57,7 @@
 			auto ctx_size_label = hl->addChild( "label_ctx_size", "QLabel" );
 			ctx_size_label->set( "ctx_size" );
 			ctx_size_label->set( "width", (Buint)130 );
-			auto ctx_size = hl->addChild( "ctx_size", "QLineEdit_uint" );
+			hl->addChild( "ctx_size", "QLineEdit_uint" );
 		}
 
 		// REPEAT PENALTY
@@ -66,7 +66,7 @@
 			auto repeat_penalty_label = hl->addChild( "label_repeat_penalty", "QLabel" );
 			repeat_penalty_label->set( "repeat_penalty" );
 			repeat_penalty_label->set( "width", (Buint)130 );
-			auto repeat_penalty = hl->addChild( "repeat_penalty", "QLineEdit_float" );
+			hl->addChild( "repeat_penalty", "QLineEdit_float" );
 		}
 
 		// PROMPT ASSISTANT
@@ -75,7 +75,7 @@
 			auto prompt_assistant_label = hl->addChild( "label_prompt_assistant", "QLabel" );
 			prompt_assistant_label->set( "prompt_assistant" );
 			prompt_assistant_label->set( "width", (Buint)130 );
-			auto prompt_assistant = hl->addChild( "prompt_assistant", "QLineEdit" );
+			hl->addChild( "prompt_assistant", "QLineEdit" );
 		}
 		
 		// // SESSION NAME

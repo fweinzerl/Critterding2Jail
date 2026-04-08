@@ -45,7 +45,7 @@
 
 			auto spawner = addChild( "spawner", "QApplicationSpawner" );
 			// auto t_parent_to_add_to = spawner->getChildCustom( parent() );
-			auto t_parent_to_add_to = spawner->getChildCustom( this );
+			spawner->getChildCustom( this );
 			removeChild( spawner );
 
 		pluginManager()->load( "app_admin_window", "src/plugins/be_plugin_app_admin_window", "be_plugin_app_admin_window" );
@@ -173,7 +173,7 @@
 
 		// COMMANDS
 			auto commands = glwindow->addChild( "commands", new BEntity() );
-			auto toggleFullscreen = commands->addChild( "toggleFullscreen", new cmd_toggleFullscreen() );
+			commands->addChild( "toggleFullscreen", new cmd_toggleFullscreen() );
 			auto launchAdminWindow = commands->addChild( "launchAdminWindow", new cmd_launchAdminWindow() );
 			auto launchControlPanel = commands->addChild( "launchControlPanel", new cmd_launchControlPanel() );
 			auto launchLifeStatsPanel = commands->addChild( "launchLifeStatsPanel", new cmd_launchLifeStatsPanel() );
@@ -283,8 +283,8 @@
 
 		// "SHADERS" hack for now
 			auto shaders = t_graphicsModelSystem->addChild( "shaders", "entity" );
-			auto u_vec4_color = shaders->addChild( "u_Color", "ShaderUniformVec4" );
-			auto u_i14_textureSample = shaders->addChild( "u_textureSample", "ShaderUniformI1" );
+			shaders->addChild( "u_Color", "ShaderUniformVec4" );
+			shaders->addChild( "u_textureSample", "ShaderUniformI1" );
 			shaders->addChild( "e_scale_x", "float" )->set(0.0f);
 			shaders->addChild( "e_scale_y", "float" )->set(0.0f);
 			shaders->addChild( "e_scale_z", "float" )->set(0.0f);

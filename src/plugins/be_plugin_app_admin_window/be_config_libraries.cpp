@@ -169,7 +169,7 @@
 				// EXPAND & COLLAPSE (command will change to collapse when command is ran)
 				{
 					auto button_add = hboxlayout_entity->addChild("admin_button_expand", "QPushButton" );
-					auto checkbox_loaded = hboxlayout_entity->addChild("admin_button_expand", "QCheckBox" );
+					hboxlayout_entity->addChild("admin_button_expand", "QCheckBox" );
 					
 					// CHECKBOX TOGGLE
 					// if ( entity->hasChildren() )

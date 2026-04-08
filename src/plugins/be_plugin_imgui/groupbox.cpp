@@ -1,10 +1,11 @@
 #include "groupbox.h"
 #include "imgui/imgui.h"
+#include <cstring>
 #include <sstream>
 
 	void BImGuiGroupBox::process()
 	{
-		if ( parent()->class_id() == "ImGuiHBoxLayout" && parent()->children()[0] != this )
+		if ( std::strcmp(parent()->class_id(), "ImGuiHBoxLayout") == 0 && parent()->children()[0] != this )
 			ImGui::SameLine();
 
 		ImGuiWindowFlags window_flags = ImGuiWindowFlags_HorizontalScrollbar;

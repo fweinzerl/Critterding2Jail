@@ -105,12 +105,6 @@
 		graphics/be_vertex_array.h
 		graphics/be_vertex_array.cpp
 
-		tinyxml/tinyxml.cpp
-		tinyxml/tinyxml.h
-		tinyxml/tinystr.cpp
-		tinyxml/tinystr.h
-		tinyxml/tinyxmlparser.cpp
-		tinyxml/tinyxmlerror.cpp
 	)
 
 	ADD_LIBRARY( be_plugin_bullet SHARED ${plugin_SRCS} )

@@ -1016,7 +1016,6 @@
 		{
 			// Assume that the existing transform matrix is stored in a float array called "transformMatrix" of size 16
 			// Also assume that the new rotation angles around x, y, and z axes are stored in variables "angleX", "angleY", and "angleZ" (in radians)
-			auto x = get_float( "rotation_euler_x" );
 			auto y = get_float( "rotation_euler_y" );
 			auto z = get_float( "rotation_euler_z" );
 
@@ -1029,7 +1028,7 @@
 			m_value[6] = 0.0f;
 			m_value[8] = 0.0f;
 			m_value[9] = 0.0f;
-			m_value[10] = 1.0f;			
+			m_value[10] = 1.0f;
 
 			float cosX = cos( value );
 			float sinX = sin( value );
@@ -1076,7 +1075,6 @@
 			// Assume that the existing transform matrix is stored in a float array called "transformMatrix" of size 16
 			// Also assume that the new rotation angles around x, y, and z axes are stored in variables "angleX", "angleY", and "angleZ" (in radians)
 			auto x = get_float( "rotation_euler_x" );
-			auto y = get_float( "rotation_euler_y" );
 			auto z = get_float( "rotation_euler_z" );
 
 			// set identity on our matrix first;
@@ -1135,7 +1133,6 @@
 			// Also assume that the new rotation angles around x, y, and z axes are stored in variables "angleX", "angleY", and "angleZ" (in radians)
 			auto x = get_float( "rotation_euler_x" );
 			auto y = get_float( "rotation_euler_y" );
-			auto z = get_float( "rotation_euler_z" );
 
 			// set identity on our matrix first;
 			m_value[0] = 1.0f;
