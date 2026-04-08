@@ -27,11 +27,10 @@
 - Known ASan ODR violation (`condenseWhiteSpace` in kernel/bullet tinyxml) — pre-existing, bypass with `ASAN_OPTIONS=detect_odr_violation=0`.
 
 ## Iron Maiden — Current State
-- **Phase 1 (CPG) done.** Critters walk with pure sinusoidal CPG, no brain.
-- CPG system: `cpg_system.h/.cpp` — drives hinges via `constraint->set(signal)`.
+- **Phase 1 (CPG) and Phase 2 (symmetric evolution) done.** See `decisions.yaml` for details.
+- CPG system: `cpg_system.h/.cpp` — drives hinges, manages symmetric CPG and body evolution.
 - When CPG enabled: brain creation, vision system, and lifetime learning are skipped entirely.
 - Vision system disabled in `plugin.cpp` (commented out) for CPG phases.
-- Oscillator code (from ai_codex branch) removed — will be rebuilt cleanly later.
 
 ## Bullet Hinge Motor — Key Insight
 - `enableAngularMotor(enable, targetVelocity, maxMotorImpulse)` is **persistent** — keeps running until explicitly changed/disabled.

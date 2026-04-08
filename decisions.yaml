@@ -3,7 +3,7 @@ meta:
   project: "Critterding2"
   description: "3D artificial life simulation producing emergent locomotion and animal behavior through environmental pressure"
   audience: "ALife enthusiasts, educational use"
-  last_updated: "2026-03-30"
+  last_updated: "2026-04-08"
 
 nodes:
   # ── Root (premise, no justification) ─────────────────────────────────
@@ -18,9 +18,11 @@ nodes:
     depends_on:
       - id: core_vision
         why: "Locomotion is one of the two core emergent phenomena the project aims to produce"
+      - id: guided_evolution
+        why: "Locomotion evolves within guided constraints — symmetric body plan and CPG reduce the search space"
     rejected_alternatives:
-      - what: "Free morphology mutation from the start"
-        why: "Temporarily restricted — destabilizes physics before locomotion is solved. Can be unlocked once stable gaits exist."
+      - what: "Free asymmetric morphology mutation"
+        why: "Temporarily restricted — asymmetric bodies destabilize physics and double the parameter space. Symmetric evolution is active; free morphology can be unlocked once stable gaits exist."
 
   - id: behavioral_diversity
     label: "Distinct animal behavior roles emerge (predator, prey, scavenger, niche)"
@@ -36,6 +38,16 @@ nodes:
     depends_on:
       - id: core_vision
         why: "Experimentation with different brains, body plans, and subsystems requires hot-swappable modules — otherwise each variant means a rewrite"
+
+  - id: guided_evolution
+    label: "Evolution follows a structured path so the environment visibly shapes the organism"
+    depends_on:
+      - id: core_vision
+        why: "Unconstrained search spaces are too large — guiding evolution through symmetric body plans and CPG locomotion lets environmental pressure produce visible adaptation in feasible time"
+    rejected_alternatives:
+      - what: "Fully open-ended evolution from the start"
+        why: "Combinatorial explosion — random morphology plus random control is intractable. Guided constraints reduce the search space to where selection pressure can act."
+    note: "The goal is not to hand-design the outcome but to constrain the search space so that environmental pressure becomes the dominant force shaping the organism."
 
   - id: observability
     label: "Simulation state and evolutionary progress are observable in real-time"
@@ -77,11 +89,33 @@ nodes:
       - id: mechanical_locomotion
         why: "CPG gives locomotion for free — the brain modulates rather than generates movement"
       - id: swappable_body_plans
-        why: "CPG parameters (phase, amplitude, turn gain) are per body plan"
+        why: "CPG default parameters (phase, amplitude, turn gain) come from the body plan JSON"
     rejected_alternatives:
       - what: "Brain generates locomotion from scratch"
         why: "Temporarily restricted — random networks cannot discover coordinated oscillation in reasonable time. Can be unlocked once evolution is stronger."
-    note: "Hard-wired oscillator. Brain controls speed (0-1) and turn (-1 to 1). Parameters tuned once per body plan."
+    note: "Sinusoidal oscillator with symmetric left/right signals. Default params from JSON, per-critter params inherited and mutated at reproduction."
+
+  - id: symmetric_cpg_evolution
+    label: "CPG gait parameters evolve per critter through natural selection"
+    status: done
+    depends_on:
+      - id: cpg
+        why: "Evolvable CPG params build on the fixed CPG oscillator"
+      - id: guided_evolution
+        why: "Symmetric CPG halves the parameter space — left side mirrors right"
+    note: "Frequency, amplitudes, and phase offsets inherited from parent and mutated at reproduction. Auto-eat and auto-procreate in CPG mode (no brain)."
+
+  - id: symmetric_body_evolution
+    label: "Body dimensions evolve per critter with bilateral symmetry"
+    status: done
+    depends_on:
+      - id: cpg
+        why: "Body dimensions affect CPG locomotion — wider torso shifts shoulder position, longer arms change gait"
+      - id: guided_evolution
+        why: "Symmetric body roughly halves the morphology parameter space"
+      - id: swappable_body_plans
+        why: "Body evolution overrides the default body plan config at reproduction"
+    note: "Torso, shoulder, and arm scales evolvable per axis. Ratio-based expansion preserves original body plan proportions. Additive unbiased mutation."
 
   # ── Behavioral diversity ─────────────────────────────────────────────
   - id: species_system
@@ -138,11 +172,3 @@ nodes:
       - id: iron_maiden_brain
         why: "The minimal brain needs compressed inputs — 256 raw pixels would require thousands of weights"
     note: "4 signals: food_dir_x, food_dir_y, food_proximity, obstacle_ahead. Hardcoded initially, evolvable later."
-
-  - id: gentle_mutation
-    label: "Mutation uses 1% perturbations instead of full-range replacement"
-    status: open
-    depends_on:
-      - id: iron_maiden_brain
-        why: "With only 83 parameters, a single full-range replacement destroys learned circuits"
-    note: "Slight perturbation is primary mutation mode. Full replacement near-eliminated (weight 5 vs 200)."
