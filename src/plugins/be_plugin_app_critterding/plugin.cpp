@@ -195,9 +195,9 @@
 			auto binding_mouse_2 = bindings->addChild( "mousebutton_down_2", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
 			binding_mouse_2->connectServerServer( launchSelectionWindow );
 
-			auto binding_mouse_3_down = bindings->addChild( "mousebutton_down_1", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
+			auto binding_mouse_3_down = bindings->addChild( "mousebutton_down_0", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
 			binding_mouse_3_down->connectServerServer( mousePickBody );
-			auto binding_mouse_3_up = bindings->addChild( "mousebutton_up_1", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
+			auto binding_mouse_3_up = bindings->addChild( "mousebutton_up_0", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
 			binding_mouse_3_up->connectServerServer( mouseUnpickBody );
 			
 			// bindings to movements
@@ -397,8 +397,7 @@
 					}
 			}
 
-		// FIXME CONNECT THESE UP
-		// CAST RAY FROM MOUSE
+		// set ray source/target (actual raycast runs via setProcessing on physics world)
 			auto camera_position = m_camera->m_transform->m_transform.getOrigin();
 			m_raycast_source_x->set( camera_position.x() );
 			m_raycast_source_y->set( camera_position.y() );
@@ -408,8 +407,6 @@
 			m_raycast_target_x->set( rayDirection.x() );
 			m_raycast_target_y->set( rayDirection.y() );
 			m_raycast_target_z->set( rayDirection.z() );
-			
-			m_bullet_raycast->process();
 	}
 
 	BEntity* Scene::findCritter( BEntity* e1, BEntity* e2 )

@@ -4,7 +4,6 @@
 #include "kernel/be_entity_interface.h"
 #include "btBulletDynamicsCommon.h"
 #include <iostream>
-
 	class BMousePicker : public BEntity
 	{
 		public:

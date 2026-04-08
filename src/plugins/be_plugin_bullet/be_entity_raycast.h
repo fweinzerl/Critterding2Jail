@@ -7,7 +7,7 @@
 class BRaycast : public BEntity
 {
 	public:
-		BRaycast() {/* setProcessing(); */};
+		BRaycast() { setProcessing(); };
 		~BRaycast() {};
 		
 		void construct();

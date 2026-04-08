@@ -282,10 +282,10 @@
 			auto binding_mouse_2 = bindings->addChild( "mousebutton_down_2", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
 			binding_mouse_2->connectServerServer( launchSelectionWindow );
    
-			// auto binding_mouse_3_down = bindings->addChild( "mousebutton_down_3", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
-			// binding_mouse_3_down->connectServerServer( mousePickBody );
-			// auto binding_mouse_3_up = bindings->addChild( "mousebutton_up_3", new BEntity_trigger() );  // FIXME CONNECT TO bool under std_window
-			// binding_mouse_3_up->connectServerServer( mouseUnpickBody );
+			auto binding_mouse_3_down = bindings->addChild( "mousebutton_down_0", new BEntity_trigger() );
+			binding_mouse_3_down->connectServerServer( mousePickBody );
+			auto binding_mouse_3_up = bindings->addChild( "mousebutton_up_0", new BEntity_trigger() );
+			binding_mouse_3_up->connectServerServer( mouseUnpickBody );
 			
 			// bindings to movements
 			auto movement = m_camera->getChild("movement", 1);
@@ -397,8 +397,8 @@
 		// DEPTHMAP VIEWER
 			t_graphicsModelSystem->addChild("DepthMapViewer", "DepthMapViewer");
 
-		// MOUSEPICERS
-			auto mousepickers = addChild( "mousepickers", new BEntity() );
+		// MOUSEPICKERS
+			m_mousepickers = addChild( "mousepickers", new BEntity() );
 			m_raycasters = addChild( "raycasters", new BEntity() );
 
 		// THREADS FINISH
@@ -520,7 +520,7 @@
 
 						// MOUSE PICKERS
 							auto mousepicker = server->getChild("physicsworld", 1)->addChild( "mousepicker", "Bullet_MousePicker" );
-							mousepickers->addChild( "external_mousepicker", new BEntity_external() )->set( mousepicker );
+							m_mousepickers->addChild( "external_mousepicker", new BEntity_external() )->set( mousepicker );
 							
 							
 							
@@ -751,41 +751,35 @@
 
 	void Scene::process()
 	{
-// 		// std::cout << "a" << std::endl;
-// 		// CAST RAY FROM MOUSE
-// 			auto camera_position = m_camera->m_transform->m_transform.getOrigin();
-// 
-// 			m_raycast_source_x1->set( camera_position.x() );
-// 			m_raycast_source_y1->set( camera_position.y() );
-// 			m_raycast_source_z1->set( camera_position.z() );
-// 			m_raycast_source_x2->set( camera_position.x() );
-// 			m_raycast_source_y2->set( camera_position.y() );
-// 			m_raycast_source_z2->set( camera_position.z() );
-// 			m_raycast_source_x3->set( camera_position.x() );
-// 			m_raycast_source_y3->set( camera_position.y() );
-// 			m_raycast_source_z3->set( camera_position.z() );
-// 			m_raycast_source_x4->set( camera_position.x() );
-// 			m_raycast_source_y4->set( camera_position.y() );
-// 			m_raycast_source_z4->set( camera_position.z() );
-// 
-// 			btVector3 rayDirection = m_camera->getScreenDirection( m_win_width->get_int(), m_win_height->get_int(), m_mouse_x->get_int(), m_mouse_y->get_int() );
-// 			m_raycast_target_x1->set( rayDirection.x() );
-// 			m_raycast_target_y1->set( rayDirection.y() );
-// 			m_raycast_target_z1->set( rayDirection.z() );
-// 			m_raycast_target_x2->set( rayDirection.x() );
-// 			m_raycast_target_y2->set( rayDirection.y() );
-// 			m_raycast_target_z2->set( rayDirection.z() );
-// 			m_raycast_target_x3->set( rayDirection.x() );
-// 			m_raycast_target_y3->set( rayDirection.y() );
-// 			m_raycast_target_z3->set( rayDirection.z() );
-// 			m_raycast_target_x4->set( rayDirection.x() );
-// 			m_raycast_target_y4->set( rayDirection.y() );
-// 			m_raycast_target_z4->set( rayDirection.z() );
-// 			
-// 			m_bullet_raycast1->process();
-// 			m_bullet_raycast2->process();
-// 			m_bullet_raycast3->process();
-// 			m_bullet_raycast4->process();
+		// set ray source/target for all thread raycasters and mousepickers
+			auto camera_position = m_camera->m_transform->m_transform.getOrigin();
+			btVector3 rayDirection = m_camera->getScreenDirection( m_win_width->get_int(), m_win_height->get_int(), m_mouse_x->get_int(), m_mouse_y->get_int() );
+
+			for ( auto* ext : m_raycasters->children() )
+			{
+				BEntity* raycaster = ext->get_reference();
+				auto source = raycaster->getChild( "source", 1 );
+				source->getChild( "x", 1 )->set( camera_position.x() );
+				source->getChild( "y", 1 )->set( camera_position.y() );
+				source->getChild( "z", 1 )->set( camera_position.z() );
+				auto target = raycaster->getChild( "target", 1 );
+				target->getChild( "x", 1 )->set( rayDirection.x() );
+				target->getChild( "y", 1 )->set( rayDirection.y() );
+				target->getChild( "z", 1 )->set( rayDirection.z() );
+			}
+
+			for ( auto* ext : m_mousepickers->children() )
+			{
+				BEntity* picker = ext->get_reference();
+				auto source = picker->getChild( "source", 1 );
+				source->getChild( "x", 1 )->set( camera_position.x() );
+				source->getChild( "y", 1 )->set( camera_position.y() );
+				source->getChild( "z", 1 )->set( camera_position.z() );
+				auto target = picker->getChild( "target", 1 );
+				target->getChild( "x", 1 )->set( rayDirection.x() );
+				target->getChild( "y", 1 )->set( rayDirection.y() );
+				target->getChild( "z", 1 )->set( rayDirection.z() );
+			}
 	}
 
 	BEntity* Server::findCritter( BEntity* e1, BEntity* e2 )

@@ -40,6 +40,7 @@
 				BCamera* m_camera;
 
 				BEntity* m_raycasters;
+				BEntity* m_mousepickers;
 				BEntity* m_bullet_raycast;
 				BEntity* m_raycast_source_x;
 				BEntity* m_raycast_source_y;

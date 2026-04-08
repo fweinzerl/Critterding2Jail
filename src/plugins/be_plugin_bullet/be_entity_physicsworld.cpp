@@ -212,7 +212,7 @@
 			// CLEAR COLLISIONS
 // 			std::cout << "clear children" << std::endl;
 			m_collisions->clearChildren();
-			
+
 			m_physics_world->stepSimulation( m_timeStep->get_float(), m_maxSubSteps->get_int(), m_fixedTimeStep->get_float() );
 			
 			
