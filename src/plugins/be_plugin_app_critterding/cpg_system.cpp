@@ -82,13 +82,25 @@ namespace
 		if ( p < 0.0f ) p += TWO_PI;
 		return p;
 	}
+
+	// duty cycle phase warping: stretches power-stroke to fraction d, compresses recovery
+	float duty_warp(float phase, float d)
+	{
+		if ( d <= 0.01f ) d = 0.01f;
+		if ( d >= 0.99f ) d = 0.99f;
+		float threshold = TWO_PI * d;
+		if ( phase < threshold )
+			return phase / (2.0f * d);
+		else
+			return 3.14159265f + (phase - threshold) / (2.0f * (1.0f - d));
+	}
 }
 
 CpgSystem::CpgSystem()
 	: m_enabled(false)
-	, m_default_params{0.0f, 0.0f, 0.0f, 0.0f, 0.0f}
+	, m_default_params{0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.0f, 0.0f}
 	, m_default_body_params{0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}
-	, m_layout{0, 0, 0, 0, 0.0f, 0.0f}
+	, m_layout{0, 0, 0, 0}
 {
 }
 
@@ -108,10 +120,10 @@ bool CpgSystem::loadConfig(const std::string& body_plan_path)
 		return false;
 	}
 
-	// evolvable params
+	// evolvable params: read JSON shoulder/elbow as base, deltas start at 0
 	bool ok = true;
-	ok = ok && json_float(text, "cpg_shoulder_amplitude", m_default_params.shoulder_amplitude);
-	ok = ok && json_float(text, "cpg_elbow_amplitude", m_default_params.elbow_amplitude);
+	ok = ok && json_float(text, "cpg_shoulder_amplitude", m_default_params.base_shoulder_amplitude);
+	ok = ok && json_float(text, "cpg_elbow_amplitude", m_default_params.base_elbow_amplitude);
 	ok = ok && json_float(text, "cpg_elbow_phase", m_default_params.elbow_phase);
 	ok = ok && json_float(text, "cpg_side_phase_offset", m_default_params.side_phase_offset);
 	if ( !ok )
@@ -119,6 +131,10 @@ bool CpgSystem::loadConfig(const std::string& body_plan_path)
 		std::cerr << "ERROR: cpg_system: cpg_frequency present but symmetric params incomplete" << std::endl;
 		std::exit(1);
 	}
+	m_default_params.delta_shoulder_amplitude = 0.0f;
+	m_default_params.delta_elbow_amplitude = 0.0f;
+	m_default_params.base_duty_cycle = 0.5f;
+	m_default_params.delta_duty_cycle = 0.0f;
 
 	// structural layout
 	ok = true;
@@ -126,8 +142,6 @@ bool CpgSystem::loadConfig(const std::string& body_plan_path)
 	ok = ok && json_uint(text, "cpg_hinge_right_elbow", m_layout.right_elbow);
 	ok = ok && json_uint(text, "cpg_hinge_left_shoulder", m_layout.left_shoulder);
 	ok = ok && json_uint(text, "cpg_hinge_left_elbow", m_layout.left_elbow);
-	ok = ok && json_float(text, "cpg_shoulder_turn_gain", m_layout.shoulder_turn_gain);
-	ok = ok && json_float(text, "cpg_elbow_turn_gain", m_layout.elbow_turn_gain);
 	if ( !ok )
 	{
 		std::cerr << "ERROR: cpg_system: symmetric layout keys incomplete" << std::endl;
@@ -153,12 +167,13 @@ bool CpgSystem::loadConfig(const std::string& body_plan_path)
 
 	m_enabled = true;
 	std::cout << "cpg_system: loaded symmetric config, frequency=" << m_default_params.frequency
-	          << " shoulder_amp=" << m_default_params.shoulder_amplitude
-	          << " elbow_amp=" << m_default_params.elbow_amplitude << std::endl;
+	          << " shoulder_amp=" << m_default_params.base_shoulder_amplitude
+	          << " elbow_amp=" << m_default_params.base_elbow_amplitude
+	          << " duty_cycle=" << m_default_params.base_duty_cycle << std::endl;
 	return true;
 }
 
-void CpgSystem::update(CdCritter* critter, float& cpg_phase, const CpgEvolvableParams& params, float speed, float turn)
+void CpgSystem::update(CdCritter* critter, float& cpg_phase, const CpgEvolvableParams& params)
 {
 	if ( !m_enabled || critter == 0 ) return;
 
@@ -167,9 +182,18 @@ void CpgSystem::update(CdCritter* critter, float& cpg_phase, const CpgEvolvableP
 
 	cpg_phase += params.frequency;
 	if ( cpg_phase > TWO_PI )
-	{
 		cpg_phase = std::fmod(cpg_phase, TWO_PI);
-	}
+
+	// base +/- delta per side
+	const float right_shoulder_amp = params.base_shoulder_amplitude + params.delta_shoulder_amplitude;
+	const float left_shoulder_amp  = params.base_shoulder_amplitude - params.delta_shoulder_amplitude;
+	const float right_elbow_amp    = params.base_elbow_amplitude + params.delta_elbow_amplitude;
+	const float left_elbow_amp     = params.base_elbow_amplitude - params.delta_elbow_amplitude;
+	const float right_dc = params.base_duty_cycle + params.delta_duty_cycle;
+	const float left_dc  = params.base_duty_cycle - params.delta_duty_cycle;
+
+	const float right_phase = cpg_phase;
+	const float left_phase  = wrap_phase(cpg_phase + params.side_phase_offset);
 
 	const auto& cc = constraints->children();
 
@@ -177,32 +201,28 @@ void CpgSystem::update(CdCritter* critter, float& cpg_phase, const CpgEvolvableP
 	if ( m_layout.right_shoulder < cc.size() )
 	{
 		auto c = cc[m_layout.right_shoulder]->get_reference();
-		if ( c ) c->set( speed * params.shoulder_amplitude * std::sin(cpg_phase)
-		               + turn * m_layout.shoulder_turn_gain );
+		if ( c ) c->set( right_shoulder_amp * std::sin(duty_warp(right_phase, right_dc)) );
 	}
 
 	// right elbow
 	if ( m_layout.right_elbow < cc.size() )
 	{
 		auto c = cc[m_layout.right_elbow]->get_reference();
-		if ( c ) c->set( speed * params.elbow_amplitude * std::sin(cpg_phase + params.elbow_phase)
-		               + turn * m_layout.elbow_turn_gain );
+		if ( c ) c->set( right_elbow_amp * std::sin(duty_warp(wrap_phase(right_phase + params.elbow_phase), right_dc)) );
 	}
 
-	// left shoulder (mirrored body: negate signal so both arms swing same world direction)
+	// left shoulder (negate for mirror)
 	if ( m_layout.left_shoulder < cc.size() )
 	{
 		auto c = cc[m_layout.left_shoulder]->get_reference();
-		if ( c ) c->set( -speed * params.shoulder_amplitude * std::sin(cpg_phase + params.side_phase_offset)
-		                - turn * m_layout.shoulder_turn_gain );
+		if ( c ) c->set( -left_shoulder_amp * std::sin(duty_warp(left_phase, left_dc)) );
 	}
 
-	// left elbow (mirrored: phase offset, negated turn gain)
+	// left elbow
 	if ( m_layout.left_elbow < cc.size() )
 	{
 		auto c = cc[m_layout.left_elbow]->get_reference();
-		if ( c ) c->set( speed * params.elbow_amplitude * std::sin(cpg_phase + params.side_phase_offset + params.elbow_phase)
-		               - turn * m_layout.elbow_turn_gain );
+		if ( c ) c->set( left_elbow_amp * std::sin(duty_warp(wrap_phase(left_phase + params.elbow_phase), left_dc)) );
 	}
 }
 
@@ -210,24 +230,37 @@ void CpgSystem::mutate(CpgEvolvableParams& params, BEntity* rng) const
 {
 	if ( rng == 0 ) return;
 
-	// small random delta: rng returns int in [min,max], scale to float
 	auto delta = [rng](float max_delta) -> float {
 		rng->set( "min", Bint(-100) );
 		rng->set( "max", Bint(100) );
 		return max_delta * (0.01f * rng->get_int());
 	};
 
+	auto clamp = [](float& v, float lo, float hi) {
+		if ( v < lo ) v = lo;
+		if ( v > hi ) v = hi;
+	};
+
 	params.frequency += delta(0.01f);
-	if ( params.frequency < 0.002f ) params.frequency = 0.002f;
-	if ( params.frequency > 0.5f ) params.frequency = 0.5f;
+	clamp(params.frequency, 0.002f, 0.5f);
 
-	params.shoulder_amplitude += delta(0.05f);
-	if ( params.shoulder_amplitude < 0.01f ) params.shoulder_amplitude = 0.01f;
-	if ( params.shoulder_amplitude > 2.0f ) params.shoulder_amplitude = 2.0f;
+	params.base_shoulder_amplitude += delta(0.05f);
+	clamp(params.base_shoulder_amplitude, 0.01f, 2.0f);
 
-	params.elbow_amplitude += delta(0.05f);
-	if ( params.elbow_amplitude < 0.01f ) params.elbow_amplitude = 0.01f;
-	if ( params.elbow_amplitude > 2.0f ) params.elbow_amplitude = 2.0f;
+	params.delta_shoulder_amplitude += delta(0.03f);
+	clamp(params.delta_shoulder_amplitude, -1.0f, 1.0f);
+
+	params.base_elbow_amplitude += delta(0.05f);
+	clamp(params.base_elbow_amplitude, 0.01f, 2.0f);
+
+	params.delta_elbow_amplitude += delta(0.03f);
+	clamp(params.delta_elbow_amplitude, -1.0f, 1.0f);
+
+	params.base_duty_cycle += delta(0.02f);
+	clamp(params.base_duty_cycle, 0.1f, 0.9f);
+
+	params.delta_duty_cycle += delta(0.01f);
+	clamp(params.delta_duty_cycle, -0.3f, 0.3f);
 
 	params.elbow_phase = wrap_phase(params.elbow_phase + delta(0.15f));
 	params.side_phase_offset = wrap_phase(params.side_phase_offset + delta(0.15f));

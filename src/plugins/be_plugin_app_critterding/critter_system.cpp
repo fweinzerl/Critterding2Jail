@@ -1,4 +1,5 @@
 #include "critter_system.h"
+#include "food_system.h"
 #include "body_plan_config.h"
 #include "kernel/be_entity_core_types.h"
 #include "body_runtime_access.h"
@@ -115,7 +116,7 @@ namespace
 		m_minimum_number_of_units->set( Buint(20) );
 		m_intitial_energy->set( Bfloat(1500.0f) );
 		m_procreate_minimum_energy->set( Bfloat(2501.0f) );
-		m_maximum_age->set( Buint(18000) );
+		m_maximum_age->set( Buint(0) );
 		m_dropzone_position_x->set( Bfloat(-100.0f) );
 		m_dropzone_position_y->set( Bfloat(-18.0f) );
 		m_dropzone_position_z->set( Bfloat(-170.0f) );
@@ -164,7 +165,7 @@ namespace
 				m_stats_learning_avg_episode_reward->set( Bfloat(0.0f) );
 				m_stats_learning_mutations_total->set( Buint(0) );
 				m_eat_active_cost = settings->addChild( "eat_active_cost", new BEntity_float() );
-				m_eat_active_cost->set( Bfloat(0.5f) );
+				m_eat_active_cost->set( Bfloat(0.35f) );
 				m_egg_incubation_ticks = settings->addChild( "egg_incubation_ticks", new BEntity_uint() );
 				m_egg_incubation_ticks->set( Buint(500) );
 		
@@ -192,6 +193,7 @@ namespace
 		}
 
 		m_collisions = 0;
+		m_food_unit_container = 0;
 	}
 	
 	void CdCritterSystem::process()
@@ -210,6 +212,29 @@ namespace
 		// 		}
 		// 	}
 		
+		// COLLECT FOOD POSITIONS FOR SCENT FIELD
+			if ( m_food_unit_container == 0 )
+			{
+				auto food_system = parent()->getChild("food_system", 1);
+				if ( food_system )
+					m_food_unit_container = food_system->getChild("unit_container", 1);
+			}
+			m_food_positions.clear();
+			if ( m_food_unit_container )
+			{
+				const auto& fchildren = m_food_unit_container->children();
+				for ( auto it = fchildren.begin(); it != fchildren.end(); ++it )
+				{
+					auto phys_ext = (*it)->getChild("external_physics", 1);
+					if ( phys_ext && phys_ext->get_reference() )
+					{
+						auto t = phys_ext->get_reference()->getChild("transform", 1);
+						if ( t )
+							m_food_positions.push_back({ t->get_float("position_x"), t->get_float("position_z") });
+					}
+				}
+			}
+
 		// AGE ALL UNITS WITH A DAY, COUNT UP ALL ENERGY FROM UNITS (FIXME ACCOUNT FOR CRITTERS, MAKE GLOBAL VARIABLE FOR TOTAL ENERGY)
 			float total_energy_in_entities(0.0f);
 			for_all_children_of( m_unit_container )
@@ -234,8 +259,20 @@ namespace
 					}
 
 					total_energy_in_entities += critter_unit->energy();
+
+					// scent field at critter position
+					if ( critter_unit->m_transform_shortcut && !m_food_positions.empty() )
+					{
+						float cx = critter_unit->m_transform_shortcut->get_float("position_x");
+						float cz = critter_unit->m_transform_shortcut->get_float("position_z");
+						auto scent = compute_scent(cx, cz, m_food_positions, 1.0f);
+						critter_unit->m_scent_field = scent.field;
+						critter_unit->m_scent_grad_x = scent.grad_x;
+						critter_unit->m_scent_grad_z = scent.grad_z;
+					}
+
 					// CPG: fixed speed=1, turn=0 (brain control comes later)
-					m_cpg_system.update( critter_unit, critter_unit->m_cpg_phase, critter_unit->m_cpg_params, 1.0f, 0.0f );
+					m_cpg_system.update( critter_unit, critter_unit->m_cpg_phase, critter_unit->m_cpg_params );
 				}
 			}
 			m_stats_energy_total->set( total_energy_in_entities );
@@ -282,8 +319,8 @@ namespace
 				auto critter_unit = dynamic_cast<CdCritter*>( *child2 );
 				if ( critter_unit )
 				{
-					// reached max age or energy is depleted
-					if ( critter_unit->age() >= m_maximum_age->get_uint() || critter_unit->energy() <= 0.0f )
+					// reached max age (0 = no limit) or energy is depleted
+					if ( (m_maximum_age->get_uint() > 0 && critter_unit->age() >= m_maximum_age->get_uint()) || critter_unit->energy() <= 0.0f )
 					{
 						removeCritter( *child2 );
 						

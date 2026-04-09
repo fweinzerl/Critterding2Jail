@@ -6,14 +6,19 @@ class BEntity;
 class CdCritter;
 struct BodyPlanConfig;
 
-// Evolvable CPG parameters — symmetric (left = mirror of right).
+// Evolvable CPG parameters — base (symmetric) + delta (asymmetric).
+// Right side uses (base + delta), left side uses (base - delta).
 struct CpgEvolvableParams
 {
 	float frequency;
-	float shoulder_amplitude;
-	float elbow_amplitude;
-	float elbow_phase;       // elbow offset relative to shoulder
-	float side_phase_offset; // left side offset relative to right (pi = alternating)
+	float base_shoulder_amplitude;   // symmetric: shoulder strength
+	float delta_shoulder_amplitude;  // asymmetric: shoulder left-right difference
+	float base_elbow_amplitude;      // symmetric: elbow strength
+	float delta_elbow_amplitude;     // asymmetric: elbow left-right difference
+	float base_duty_cycle;           // symmetric: power-stroke ratio (0.5 = standard sinusoid)
+	float delta_duty_cycle;          // asymmetric: left-right timing difference
+	float elbow_phase;               // elbow offset relative to shoulder
+	float side_phase_offset;         // left side offset relative to right (pi = alternating)
 };
 
 // Structural layout — fixed per body plan, not evolvable.
@@ -23,8 +28,6 @@ struct CpgSymmetricLayout
 	unsigned int right_elbow;
 	unsigned int left_shoulder;
 	unsigned int left_elbow;
-	float shoulder_turn_gain;
-	float elbow_turn_gain;
 };
 
 // Evolvable body dimensions — symmetric (left = right).
@@ -62,7 +65,7 @@ public:
 	const BodyEvolvableParams& defaultBodyParams() const { return m_default_body_params; }
 
 	// Apply one tick of CPG output to a critter's constraints.
-	void update(CdCritter* critter, float& cpg_phase, const CpgEvolvableParams& params, float speed, float turn);
+	void update(CdCritter* critter, float& cpg_phase, const CpgEvolvableParams& params);
 
 	// Expand symmetric body params into a full BodyPlanConfig (modifying the default).
 	void expandBodyParams(const BodyEvolvableParams& params, BodyPlanConfig& out) const;

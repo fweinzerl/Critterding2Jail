@@ -20,6 +20,8 @@
 		critter_system.h
 		cpg_system.cpp
 		cpg_system.h
+		scent_field.cpp
+		scent_field.h
 		body_plan_config.h
 		control_panel.cpp
 		control_panel.h
