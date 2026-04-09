@@ -28,7 +28,7 @@
 	find_package(Qt6 COMPONENTS Widgets Gui OpenGLWidgets REQUIRED)
 
 	SET(Boost_USE_MULTITHREAD ON) #set a flag
-	FIND_PACKAGE ( Boost COMPONENTS filesystem system iostreams thread REQUIRED)
+	FIND_PACKAGE ( Boost COMPONENTS filesystem iostreams thread REQUIRED)
 	if(Boost_FOUND)
 		include_directories(${Boost_INCLUDE_DIRS}) 
 	endif()	
