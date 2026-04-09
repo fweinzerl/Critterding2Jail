@@ -4,7 +4,6 @@
 #include "kernel/be_entity_ops_copy.h"
 #include "cpg_system.h"
 #include <limits>
-#include <cmath>
 
 	class CdSpeciesSystem;
 	class BeRigidBody;
@@ -141,13 +140,12 @@
 		class CdEgg : public BEntity
 		{
 			public:
-				CdEgg() : m_ticks_remaining(0), m_hatch_heading(0.0f), m_energy(0.0f) {};
+				CdEgg() : m_ticks_remaining(0), m_energy(0.0f) {};
 				const char* class_id() const { return "CdEgg"; }
 				virtual ~CdEgg() {};
 				void construct();
 
 				unsigned int m_ticks_remaining;
-				float m_hatch_heading; // Y-rotation for hatched critter (parent heading + 90°)
 				float m_pos_x, m_pos_y, m_pos_z;
 				float m_energy;
 				CpgEvolvableParams m_cpg_params;

@@ -6,7 +6,7 @@
 #include "plugins/be_plugin_bullet/be_entity_mousepicker.h"
 #include <cmath>
 #include <limits>
-// #include <iostream>
+#include <iostream>
 
 namespace
 {
@@ -236,7 +236,6 @@ namespace
 					total_energy_in_entities += critter_unit->energy();
 					// CPG: fixed speed=1, turn=0 (brain control comes later)
 					m_cpg_system.update( critter_unit, critter_unit->m_cpg_phase, critter_unit->m_cpg_params, 1.0f, 0.0f );
-					// critter_unit->m_always_firing_input->onUpdate();
 				}
 			}
 			m_stats_energy_total->set( total_energy_in_entities );
@@ -441,7 +440,6 @@ namespace
 			if ( id == std::string("procreate_critter") )
 			{
 			auto critter_unit = dynamic_cast<CdCritter*>( value->getChild("entity", 1)->get_reference() );
-			std::cout << "egg laid by ad: " << critter_unit->getChild( "adam_distance", 1 )->get_uint() << " id: " << critter_unit->id() << std::endl;
 
 			// get parent position and heading
 			if ( critter_unit->m_transform_shortcut == 0 )
@@ -454,19 +452,6 @@ namespace
 			auto parent_t = critter_unit->m_transform_shortcut;
 			float parent_heading = parent_t->get_float("rotation_euler_y");
 
-			// hatch heading: parent heading + 90°, random left or right
-			float hatch_heading = parent_heading;
-			if ( m_rng )
-			{
-				m_rng->set( "min", Bint(0) );
-				m_rng->set( "max", Bint(1) );
-				hatch_heading += m_rng->get_int() == 0 ? (M_PI * 0.5f) : -(M_PI * 0.5f);
-			}
-			else
-			{
-				hatch_heading += M_PI * 0.5f;
-			}
-
 			// place egg behind parent
 			// forward = (sin(heading), 0, -cos(heading)), behind = negated
 			float behind_offset = 1.5f;
@@ -475,7 +460,6 @@ namespace
 			egg->m_pos_y = -19.8f; // above ground, will fall and settle
 			egg->m_pos_z = parent_t->get_float("position_z") + std::cos(parent_heading) * behind_offset;
 			egg->m_ticks_remaining = m_egg_incubation_ticks->get_uint();
-			egg->m_hatch_heading = hatch_heading;
 			egg->m_energy = critter_unit->energy(); // parent already halved its energy
 
 			if ( m_cpg_system.enabled() )
@@ -569,16 +553,50 @@ namespace
 				motor_neurons->addChild( "procreate", new BEntity_float() );
 			}
 
-			// relocate critter from default spawn to egg position
+			// relocate critter from default spawn to egg's current physics position
 			if ( critter_unit->m_transform_shortcut && critter_unit->m_bodyparts_shortcut )
 			{
-				// offset = egg pos - default spawn center
+				// read egg's actual physics position (after falling/settling)
+				float egg_x = egg->m_pos_x;
+				float egg_y = egg->m_pos_y;
+				float egg_z = egg->m_pos_z;
+				auto egg_phys_ext = egg->getChild("external_physics", 1);
+				if ( egg_phys_ext && egg_phys_ext->get_reference() )
+				{
+					auto egg_t = egg_phys_ext->get_reference()->getChild("transform", 1);
+					if ( egg_t )
+					{
+						egg_x = egg_t->get_float("position_x");
+						egg_y = egg_t->get_float("position_y");
+						egg_z = egg_t->get_float("position_z");
+					}
+				}
+
+				// measure how far the body extends below center
 				float cx = critter_unit->m_transform_shortcut->get_float("position_x");
 				float cy = critter_unit->m_transform_shortcut->get_float("position_y");
 				float cz = critter_unit->m_transform_shortcut->get_float("position_z");
-				float dx = egg->m_pos_x - cx;
-				float dy = egg->m_pos_y - cy;
-				float dz = egg->m_pos_z - cz;
+				float lowest_bottom = cy;
+				{
+					const auto& parts = critter_unit->m_bodyparts_shortcut->children();
+					for ( auto it = parts.begin(); it != parts.end(); ++it )
+					{
+						auto part = (*it)->get_reference();
+						auto t = part->getChild( "transform", 1 );
+						auto sy = part->getChild( "scale_y", 1 );
+						if ( t && sy )
+						{
+							float bottom = t->get_float("position_y") - sy->get_float();
+							if ( bottom < lowest_bottom )
+								lowest_bottom = bottom;
+						}
+					}
+				}
+				float body_hang = cy - lowest_bottom;
+
+				float dx = egg_x - cx;
+				float dy = egg_y - cy + body_hang + 0.3f; // lift so lowest part clears egg
+				float dz = egg_z - cz;
 
 				for_all_children_of3( critter_unit->m_bodyparts_shortcut )
 				{
@@ -588,7 +606,6 @@ namespace
 						t->set("position_x", t->get_float("position_x") + dx);
 						t->set("position_y", t->get_float("position_y") + dy);
 						t->set("position_z", t->get_float("position_z") + dz);
-						t->set("rotation_euler_y", egg->m_hatch_heading);
 					}
 				}
 			}
