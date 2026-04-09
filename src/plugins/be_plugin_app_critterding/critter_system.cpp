@@ -91,6 +91,9 @@ namespace
 
 		// UNIT CONTAINER
 			m_unit_container = addChild( "unit_container", new BEntity() );
+
+		// EGG CONTAINER
+			m_egg_container = addChild( "egg_container", new BEntity() );
 		
 		// // REGISTER UNIT CONTAINER IN VISION SYSTEM
 		// 	vision_system->set("register_container", m_unit_container);
@@ -162,6 +165,8 @@ namespace
 				m_stats_learning_mutations_total->set( Buint(0) );
 				m_eat_active_cost = settings->addChild( "eat_active_cost", new BEntity_float() );
 				m_eat_active_cost->set( Bfloat(0.5f) );
+				m_egg_incubation_ticks = settings->addChild( "egg_incubation_ticks", new BEntity_uint() );
+				m_egg_incubation_ticks->set( Buint(500) );
 		
 		m_mouse_picker = 0;
 		auto ext = parent()->getChild("external_mousepicker", 1);
@@ -237,6 +242,22 @@ namespace
 			m_stats_energy_total->set( total_energy_in_entities );
 			if ( !m_cpg_system.enabled() )
 				updateLifetimeLearning();
+
+		// HATCH EGGS
+			for_all_children_of2( m_egg_container )
+			{
+				auto egg = static_cast<CdEgg*>( *child2 );
+				if ( egg->m_ticks_remaining == 0 )
+				{
+					auto cmd_hatch = m_command_buffer->addChild( "pass_command", new BEntity_reference() );
+					cmd_hatch->set(this);
+					auto command = cmd_hatch->addChild( "command", new BEntity_string() );
+					command->set("hatch_egg");
+					command->addChild( "entity", new BEntity_reference() )->set( egg );
+					return;
+				}
+				egg->m_ticks_remaining--;
+			}
 
 		// INSERT NEW RANDOM CRITTER, only check every 100 frames
 			if ( m_minimum_number_of_units->get_uint() > 0 && (++m_framecount == m_insert_frame_interval->get_uint() || m_insert_frame_interval->get_uint() == 0 ) )
@@ -420,129 +441,179 @@ namespace
 			if ( id == std::string("procreate_critter") )
 			{
 			auto critter_unit = dynamic_cast<CdCritter*>( value->getChild("entity", 1)->get_reference() );
-			// std::cout << "ad: " << critter_unit->getChild( "adam_distance", 1 )->get_uint() << " total:" << m_unit_container->numChildren()+1 << "(h: " << t_highest << ")" << ": " << critter_unit->id() << std::endl;
-			std::cout << "ad: " << critter_unit->getChild( "adam_distance", 1 )->get_uint() << " total:" << m_unit_container->numChildren()+1 << ": " << critter_unit->id() << std::endl;
+			std::cout << "egg laid by ad: " << critter_unit->getChild( "adam_distance", 1 )->get_uint() << " id: " << critter_unit->id() << std::endl;
 
-			// critter_unit->setEnergy( critter_unit->energy() / 2 );
-			// critter_unit->setAge( Buint(0) );
-			
-			// COPY CRITTER — for CPG mode, set body override before copy
-				BodyPlanConfig child_body_cfg;
-				BodyEvolvableParams child_body_params;
-				if ( m_cpg_system.enabled() )
-				{
-					child_body_params = critter_unit->m_body_params;
-					m_cpg_system.mutateBody( child_body_params, m_rng );
-					m_cpg_system.expandBodyParams( child_body_params, child_body_cfg );
-					cd_body_plan_set_override( &child_body_cfg );
-				}
-				auto critter_new = dynamic_cast<CdCritter*>( m_entityCopy.copyEntity( critter_unit ) );
-				if ( m_cpg_system.enabled() )
-				{
-					cd_body_plan_set_override( nullptr );
-					critter_new->m_body_params = child_body_params;
-				}
-				critter_new->getChild( "age", 1 )->set( Buint(0) );
-				refreshBodyShortcuts( critter_new );
-				resetLearningState( critter_new );
-				// critter_new->getChild( "energy", 1 )->set( Buint(0) );
-
-			// CHANGE POSITION to above parent
-			if ( !m_copy_random_position->get_bool() )
+			// get parent position and heading
+			if ( critter_unit->m_transform_shortcut == 0 )
+				refreshBodyShortcuts( critter_unit );
+			if ( critter_unit->m_transform_shortcut == 0 )
 			{
-				float spawn_offset_x(0.0f);
-				float spawn_offset_z(0.0f);
-				if ( m_rng )
-				{
-					m_rng->set( "min", Bint(-250) );
-					m_rng->set( "max", Bint(250) );
-					spawn_offset_x = 0.01f * m_rng->get_int();
-					m_rng->set( "min", Bint(-250) );
-					m_rng->set( "max", Bint(250) );
-					spawn_offset_z = 0.01f * m_rng->get_int();
-					if ( spawn_offset_x > -0.3f && spawn_offset_x < 0.3f &&
-					     spawn_offset_z > -0.3f && spawn_offset_z < 0.3f )
-					{
-						spawn_offset_x = 1.5f;
-						spawn_offset_z = -1.5f;
-					}
-				}
+				std::cerr << "ERROR: procreate_critter: no transform on parent" << std::endl;
+				return false;
+			}
+			auto parent_t = critter_unit->m_transform_shortcut;
+			float parent_heading = parent_t->get_float("rotation_euler_y");
 
-				auto bodyparts_old = critter_unit->m_bodyparts_shortcut;
-				if ( bodyparts_old == 0 )
-				{
-					refreshBodyShortcuts( critter_unit );
-					bodyparts_old = critter_unit->m_bodyparts_shortcut;
-				}
-				if ( critter_new->m_bodyparts_shortcut == 0 )
-				{
-					refreshBodyShortcuts( critter_new );
-				}
-				if ( bodyparts_old == 0 || critter_new->m_bodyparts_shortcut == 0 )
-				{
-					std::cerr << "ERROR: procreate_critter: missing bodyparts shortcut in source or copy" << std::endl;
-					std::exit(1);
-				}
-				
-				const auto& children_old = bodyparts_old->children();
-				const auto& children_new = critter_new->m_bodyparts_shortcut->children();
-				if ( children_old.size() != children_new.size() )
-				{
-					std::cerr << "ERROR: procreate_critter: bodyparts size mismatch source=" << children_old.size()
-					          << " copy=" << children_new.size() << std::endl;
-					std::exit(1);
-				}
-				auto old_child = children_old.begin();
+			// hatch heading: parent heading + 90°, random left or right
+			float hatch_heading = parent_heading;
+			if ( m_rng )
+			{
+				m_rng->set( "min", Bint(0) );
+				m_rng->set( "max", Bint(1) );
+				hatch_heading += m_rng->get_int() == 0 ? (M_PI * 0.5f) : -(M_PI * 0.5f);
+			}
+			else
+			{
+				hatch_heading += M_PI * 0.5f;
+			}
 
-				for_all_children_of3( critter_new->m_bodyparts_shortcut )
+			// place egg behind parent
+			// forward = (sin(heading), 0, -cos(heading)), behind = negated
+			float behind_offset = 1.5f;
+			auto egg = new CdEgg();
+			egg->m_pos_x = parent_t->get_float("position_x") - std::sin(parent_heading) * behind_offset;
+			egg->m_pos_y = -19.8f; // above ground, will fall and settle
+			egg->m_pos_z = parent_t->get_float("position_z") + std::cos(parent_heading) * behind_offset;
+			egg->m_ticks_remaining = m_egg_incubation_ticks->get_uint();
+			egg->m_hatch_heading = hatch_heading;
+			egg->m_energy = critter_unit->energy(); // parent already halved its energy
+
+			if ( m_cpg_system.enabled() )
+			{
+				// inherit and mutate CPG + body params
+				egg->m_cpg_params = critter_unit->m_cpg_params;
+				m_cpg_system.mutate( egg->m_cpg_params, m_rng );
+				egg->m_body_params = critter_unit->m_body_params;
+				m_cpg_system.mutateBody( egg->m_body_params, m_rng );
+			}
+
+			m_egg_container->addChild( "egg", egg );
+			return true;
+		}
+
+			if ( id == std::string("hatch_egg") )
+			{
+			auto egg = dynamic_cast<CdEgg*>( value->getChild("entity", 1)->get_reference() );
+			if ( !egg )
+			{
+				std::cerr << "ERROR: hatch_egg: invalid egg reference" << std::endl;
+				return false;
+			}
+
+			// create critter from egg genetics
+			auto critter_unit = new CdCritter();
+			m_unit_container->addChild( "critter_unit", critter_unit );
+			critter_unit->setEnergy( egg->m_energy );
+			if ( m_cpg_system.enabled() )
+			{
+				critter_unit->m_cpg_params = egg->m_cpg_params;
+				critter_unit->m_body_params = egg->m_body_params;
+			}
+			resetLearningState( critter_unit );
+			m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
+
+			// body — apply body override for evolved body params
+			BodyPlanConfig child_body_cfg;
+			if ( m_cpg_system.enabled() )
+			{
+				m_cpg_system.expandBodyParams( critter_unit->m_body_params, child_body_cfg );
+				cd_body_plan_set_override( &child_body_cfg );
+			}
+			auto newBody = m_body_system_unit_container->addChild( "body", new BEntity() );
+			newBody->addChild( "body", "CdBodyPlan" );
+			if ( m_cpg_system.enabled() )
+				cd_body_plan_set_override( nullptr );
+
+			critter_unit->addChild( "external_body", new BEntity_external() )->set( newBody );
+			refreshBodyShortcuts( critter_unit );
+
+			// brain or motor neurons
+			if ( !m_cpg_system.enabled() )
+			{
+				critter_unit->m_brain = m_brain_system->getChild( "unit_container", 1)->addChild( "brain", "Brain" );
+				auto outputs = critter_unit->m_brain->getChild( "outputs", 1 );
+				auto constraints = critter_unit->m_constraints_shortcut;
+				auto constraints_ref = outputs->addChild( "bullet_constraints", new BEntity_reference() );
+				constraints_ref->set( constraints );
+
+				auto motor_neurons = critter_unit->addChild( "motor_neurons", new BEntity() );
+				motor_neurons->addChild( "eat", new BEntity_float() );
+				motor_neurons->addChild( "procreate", new BEntity_float() );
+				auto motor_neurons_ref = outputs->addChild( "motor_neurons_ref", new BEntity_reference() );
+				motor_neurons_ref->set( motor_neurons );
+
+				auto inputs = critter_unit->m_brain->getChild( "inputs", 1 );
+				for_all_children_of3( constraints )
 				{
-					if ( old_child == children_old.end() )
-					{
-						std::cerr << "ERROR: procreate_critter: source bodyparts iterator exhausted early" << std::endl;
-						std::exit(1);
-					}
+					auto constraint_angle_input = inputs->addChild( "constraint_angle", new BEntity_float() );
+					auto angle = (*child3)->get_reference()->getChild("angle", 1);
+					if ( angle && constraint_angle_input )
+						angle->connectServerServer( constraint_angle_input );
+				}
+				const unsigned int retinasize = find_vision_retina_size_or_die(this);
+				do_times( retinasize*retinasize )
+				{
+					inputs->addChild( "vision_value_R", new BEntity_float() );
+					inputs->addChild( "vision_value_G", new BEntity_float() );
+					inputs->addChild( "vision_value_B", new BEntity_float() );
+					inputs->addChild( "vision_value_A", new BEntity_float() );
+				}
+				critter_unit->m_brain = m_brain_system->getChildCustom( critter_unit->m_brain, "new" );
+				critter_unit->addChild( "external_brain", new BEntity_external() )->set( critter_unit->m_brain );
+				critter_unit->m_brain_inputs = critter_unit->m_brain->getChild( "inputs", 1 );
+			}
+			else
+			{
+				auto motor_neurons = critter_unit->addChild( "motor_neurons", new BEntity() );
+				motor_neurons->addChild( "eat", new BEntity_float() );
+				motor_neurons->addChild( "procreate", new BEntity_float() );
+			}
+
+			// relocate critter from default spawn to egg position
+			if ( critter_unit->m_transform_shortcut && critter_unit->m_bodyparts_shortcut )
+			{
+				// offset = egg pos - default spawn center
+				float cx = critter_unit->m_transform_shortcut->get_float("position_x");
+				float cy = critter_unit->m_transform_shortcut->get_float("position_y");
+				float cz = critter_unit->m_transform_shortcut->get_float("position_z");
+				float dx = egg->m_pos_x - cx;
+				float dy = egg->m_pos_y - cy;
+				float dz = egg->m_pos_z - cz;
+
+				for_all_children_of3( critter_unit->m_bodyparts_shortcut )
+				{
 					auto t = (*child3)->get_reference()->getChild( "transform", 1 );
-					auto oldt = (*old_child)->get_reference()->getChild( "transform", 1 );
 					if ( t )
 					{
-						// std::cout << "changing position" << std::endl;
-						t->set("position_x", oldt->get_float("position_x") + spawn_offset_x);
-						t->set("position_y", oldt->get_float("position_y") + 0.75f);
-						t->set("position_z", oldt->get_float("position_z") + spawn_offset_z);
+						t->set("position_x", t->get_float("position_x") + dx);
+						t->set("position_y", t->get_float("position_y") + dy);
+						t->set("position_z", t->get_float("position_z") + dz);
+						t->set("rotation_euler_y", egg->m_hatch_heading);
 					}
-					old_child++;
 				}
 			}
 
-				if ( m_cpg_system.enabled() )
-				{
-					// CPG mode: inherit and mutate CPG + body params
-					critter_new->m_cpg_params = critter_unit->m_cpg_params;
-					m_cpg_system.mutate( critter_new->m_cpg_params, m_rng );
-					auto ad = critter_new->getChild( "adam_distance", 1 );
-					ad->set( ad->get_uint() + 1 );
-				}
-				else
-				{
-					// Brain mode: mutate brain
-					BEntity* brain_new = 0;
-					for_all_children_of3( critter_new )
-					{
-						if ( (*child3)->name() == "external_brain" )
-						{
-							if ( (*child3)->get_reference()->name() == "brain" )
-							{
-								brain_new = (*child3)->get_reference();
-							}
-						}
-					}
-					if ( m_brain_system->set( "mutate", brain_new ) )
-					{
-						auto ad = critter_new->getChild( "adam_distance", 1 );
-						ad->set( ad->get_uint() + 1 );
-					}
-				}
-				m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
+			// set adam_distance from parent
+			if ( m_cpg_system.enabled() )
+			{
+				auto ad = critter_unit->getChild( "adam_distance", 1 );
+				ad->set( ad->get_uint() + 1 );
+			}
+
+			// remove egg (physics + graphics + entity)
+			auto egg_physics = egg->getChild("external_physics", 1);
+			if ( egg_physics )
+			{
+				auto physicsworld = egg_physics->get_reference()->parent();
+				physicsworld->removeChild( egg_physics->get_reference() );
+			}
+			auto egg_graphics = egg->getChild("external_graphics", 1);
+			if ( egg_graphics )
+			{
+				auto graphics_parent = egg_graphics->get_reference()->parent();
+				graphics_parent->removeChild( egg_graphics->get_reference() );
+			}
+			m_egg_container->removeChild( egg );
 
 			return true;
 		}
@@ -912,7 +983,51 @@ namespace
 		m_physics_component_shortcut = 0;
 		m_bodyparts_shortcut = 0;
 	}
-	
-	
-	
-	
+
+	void CdEgg::construct()
+	{
+		// small static physics cube
+		auto physicsworld = parent()->parent()->parent()->getChild("physicsworld", 1);
+		if ( !physicsworld )
+		{
+			std::cerr << "ERROR: CdEgg: no physicsworld found" << std::endl;
+			std::exit(1);
+		}
+
+		auto egg_physics = physicsworld->addChild( "egg", "PhysicsEntity_Cube" );
+		egg_physics->addChild( "weight", new BEntity_float_property() )->set( 0.5f );
+		egg_physics->addChild( "scale_x", new BEntity_float_property() )->set( 0.6f );
+		egg_physics->addChild( "scale_y", new BEntity_float_property() )->set( 0.6f );
+		egg_physics->addChild( "scale_z", new BEntity_float_property() )->set( 0.6f );
+
+		auto physics_transform = egg_physics->getChild( "transform", 1 );
+		physics_transform->getChild("position_x", 1)->set( m_pos_x );
+		physics_transform->getChild("position_y", 1)->set( m_pos_y );
+		physics_transform->getChild("position_z", 1)->set( m_pos_z );
+
+		addChild( "external_physics", new BEntity_external() )->set( egg_physics );
+
+		// graphics
+		auto graphicsmodelsystem = topParent()->getChild("bin", 1)->getChild("Critterding", 1)->getChild("GLWindow", 1)->getChild("GraphicsModelSystem", 1);
+		if ( graphicsmodelsystem )
+		{
+			auto graphics_entity_egg = graphicsmodelsystem->getChild( "graphics_entity_egg", 1 );
+			BEntity* graphics_transform_egg(0);
+			if ( !graphics_entity_egg )
+			{
+				graphics_entity_egg = graphicsmodelsystem->addChild("graphics_entity_egg", "GraphicsModel");
+				graphics_entity_egg->getChild( "pre_scale_x", 1 )->set( 0.6f );
+				graphics_entity_egg->getChild( "pre_scale_y", 1 )->set( 0.6f );
+				graphics_entity_egg->getChild( "pre_scale_z", 1 )->set( 0.6f );
+				graphics_entity_egg->set("filename", "../share/modules/cube-egg.obj");
+				graphics_transform_egg = graphics_entity_egg->addChild("transform", "Transform");
+			}
+			else
+			{
+				graphics_transform_egg = graphics_entity_egg->addChild("transform", "Transform");
+			}
+			addChild( "external_graphics", new BEntity_external() )->set( graphics_transform_egg );
+			physics_transform->connectServerServer(graphics_transform_egg, true);
+		}
+	}
+

@@ -18,7 +18,7 @@
 ## Project Structure
 - 3D artificial life simulation using Bullet Physics, OpenGL, Qt6.
 - Plugin-based architecture (`be_plugin_*`).
-- Brain: spiking neural network (`be_plugin_brainz`), being supplemented by Iron Maiden (feedforward, CPG-based).
+- Brain: spiking neural network (`be_plugin_brainz`), being replaced by CPG + modulation network approach.
 - Two runtime modes: single-thread (`app_critterding`) and multi-thread (`app_critterding_threads`).
 - Known issue: threaded mode crashes in debug builds with ImGui assertion (NewFrame/EndFrame race condition). ImGui is not thread-safe. Use single-thread mode for debugging.
 
@@ -27,8 +27,8 @@
 - `compile-debug.sh` — debug build with `-fsanitize=address`.
 - TinyXML is built once as a shared library (`kernel/tinyxml/`). Plugins use the kernel copy via `"kernel/tinyxml/tinyxml.h"` — no local copies.
 
-## Iron Maiden — Current State
-- **Phase 1 (CPG) and Phase 2 (symmetric evolution) done.** See `decisions.yaml` for details.
+## Current State
+- **CPG and symmetric evolution done.** See `decisions.yaml` for details.
 - CPG system: `cpg_system.h/.cpp` — drives hinges, manages symmetric CPG and body evolution.
 - When CPG enabled: brain creation, vision system, and lifetime learning are skipped entirely.
 - Vision system disabled in `plugin.cpp` (commented out) for CPG phases.
@@ -40,7 +40,7 @@
 - Old approach (input as force, fixed velocity) caused gravity-drift. Don't revert to that.
 
 ## Planning Documents
-- `ROADMAP.md` — Long-term vision (predator-prey ecosystem) + observability/tooling tasks.
-- `PLAN_IRON_MAIDEN.md` — Brain/evolution/emergence plan (CPG, vision compression, minimal brain, phased bootstrapping).
 - `decisions.yaml` — Decision DAG tracking feature status.
-- Superseded: `PLAN_JAIL_BRAIN.md`, `TODO.md`, `code-style.md` (from `ai_codex` branch).
+- `alife-erweiterung-0.md` — Egg mechanics.
+- `alife-erweiterung-1.md` — CPG modulation network, Hebbian learning, hormone system.
+- `alife-erweiterung-2.md` — Vision (6×6 RGB, evolved conv filters), NEAT inner evolution, Lamarck inheritance.

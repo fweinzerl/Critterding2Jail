@@ -152,23 +152,3 @@ nodes:
         why: "Graphs are the fastest way to see whether the simulation is alive and evolving"
     note: "Ring buffer (300 samples), update at panel refresh rate. F4 opens in both runtimes."
 
-  # ── Iron Maiden (brain) ─────────────────────────────────────────────
-  - id: iron_maiden_brain
-    label: "Minimal feedforward brain (6 inputs, 8 hidden, 3 outputs = 83 parameters)"
-    depends_on:
-      - id: swappable_brains
-        why: "Iron Maiden is one brain implementation behind the common brain interface"
-    rejected_alternatives:
-      - what: "Continue with spiking network only"
-        why: "256 raw inputs into random synapses produces noise, not learning — too many parameters for gentle mutation"
-      - what: "Free topology evolution (NEAT-style) from the start"
-        why: "Temporarily restricted — fixed topology is needed until basic evolution works. Can be unlocked later."
-    note: "Outputs: speed (sigmoid 0-1), turn (tanh -1 to 1), eat (sigmoid 0-1). Weight count small enough for 1% perturbation mutation."
-
-  - id: vision_compression
-    label: "Hardcoded 256-to-4 retina compression before brain input"
-    status: open
-    depends_on:
-      - id: iron_maiden_brain
-        why: "The minimal brain needs compressed inputs — 256 raw pixels would require thousands of weights"
-    note: "4 signals: food_dir_x, food_dir_y, food_proximity, obstacle_ahead. Hardcoded initially, evolvable later."
