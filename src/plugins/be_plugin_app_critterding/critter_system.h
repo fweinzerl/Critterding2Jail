@@ -4,6 +4,7 @@
 #include "kernel/be_entity_ops_copy.h"
 #include "cpg_system.h"
 #include "scent_field.h"
+#include "modulation_network.h"
 #include <limits>
 #include <vector>
 
@@ -11,6 +12,17 @@
 	class BeRigidBody;
 	class BMousePicker;
 	class CdCritter;
+
+	// All persistent critter state that must survive copy operations (migration,
+	// procreation, hatching). Adding a new heritable/genome field here is the
+	// ONLY place you need to touch — everything else cascades via struct copy.
+	struct CritterGenome
+	{
+		CpgEvolvableParams   cpg_params {};
+		BodyEvolvableParams  body_params {};
+		ModulationNetwork    mod_net {};
+		float                cpg_phase = 0.0f;
+	};
 
 	//  SYSTEM
 		class CdCritterSystem : public BEntity
@@ -33,6 +45,9 @@
 					void resetLearningState(CdCritter* critter);
 					float readVisionGreenSum(CdCritter* critter);
 					bool mutateBrainSlightly(CdCritter* critter);
+					// Shared spawn path for both fresh critters (inherited == nullptr)
+					// and hatchlings (inherited points to the egg's genome).
+					CdCritter* spawnCritter(float initial_energy, const CritterGenome* inherited);
 
 				BMousePicker* m_mouse_picker;
 				BEntity* m_unit_container;
@@ -96,7 +111,6 @@
 						  m_learning_episode_tick_entity(0), m_learning_episode_reward_entity(0),
 					  m_learning_best_episode_reward_entity(0), m_learning_last_reward_entity(0), m_learning_last_green_entity(0),
 					  m_body_root_shortcut(0), m_constraints_shortcut(0), m_transform_shortcut(0), m_physics_component_shortcut(0), m_bodyparts_shortcut(0),
-					  m_cpg_phase(0.0f), m_cpg_params{0.0f, 0.0f,0.0f, 0.0f,0.0f, 0.5f,0.0f, 0.0f, 0.0f}, m_body_params{0,0,0, 0,0,0, 0,0,0},
 					  m_scent_field(0.0f), m_scent_grad_x(0.0f), m_scent_grad_z(0.0f),
 					  m_age(0), m_energy(0), m_species(0)
 				{
@@ -132,9 +146,7 @@
 				BEntity* m_transform_shortcut;
 				BEntity* m_physics_component_shortcut;
 				BEntity* m_bodyparts_shortcut;
-				float m_cpg_phase;
-				CpgEvolvableParams m_cpg_params;
-				BodyEvolvableParams m_body_params; // unused for now — infrastructure for body evolution
+				CritterGenome m_genome;
 
 				// scent field at current position
 				float m_scent_field;
@@ -160,6 +172,5 @@
 				unsigned int m_ticks_remaining;
 				float m_pos_x, m_pos_y, m_pos_z;
 				float m_energy;
-				CpgEvolvableParams m_cpg_params;
-				BodyEvolvableParams m_body_params;
+				CritterGenome m_genome;
 		};

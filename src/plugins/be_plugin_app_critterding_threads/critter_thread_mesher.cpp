@@ -136,6 +136,11 @@ namespace
 			auto critter_new = dynamic_cast<CdCritter*>( m_entityCopy.copyEntity( entity, value->getChild("target")->get_reference() ) );
 			auto critter_old = dynamic_cast<CdCritter*>( entity );
 
+			// COPY C++ MEMBERS (not visible to entity copy mechanism).
+			// Bundled in CritterGenome so we can't forget a field — adding
+			// a new heritable/runtime member means only touching the struct.
+				critter_new->m_genome = critter_old->m_genome;
+
 			// FIXME should be inherent?
 			// AGE, ENERGY, AD
 				auto age = critter_new->getChild( "age", 1 );

@@ -113,9 +113,9 @@ namespace
 		m_dropzone_size_y = dropzone->addChild( "size_y", new BEntity_float() );
 		m_dropzone_size_z = dropzone->addChild( "size_z", new BEntity_float() );
 		
-		m_minimum_number_of_units->set( Buint(20) );
+		m_minimum_number_of_units->set( Buint(4) );
 		m_intitial_energy->set( Bfloat(1500.0f) );
-		m_procreate_minimum_energy->set( Bfloat(2501.0f) );
+		m_procreate_minimum_energy->set( Bfloat(5001.0f) );
 		m_maximum_age->set( Buint(0) );
 		m_dropzone_position_x->set( Bfloat(-100.0f) );
 		m_dropzone_position_y->set( Bfloat(-18.0f) );
@@ -263,16 +263,78 @@ namespace
 					// scent field at critter position
 					if ( critter_unit->m_transform_shortcut && !m_food_positions.empty() )
 					{
-						float cx = critter_unit->m_transform_shortcut->get_float("position_x");
-						float cz = critter_unit->m_transform_shortcut->get_float("position_z");
+						const float cx = critter_unit->m_transform_shortcut->get_float("position_x");
+						const float cz = critter_unit->m_transform_shortcut->get_float("position_z");
 						auto scent = compute_scent(cx, cz, m_food_positions, 1.0f);
 						critter_unit->m_scent_field = scent.field;
 						critter_unit->m_scent_grad_x = scent.grad_x;
 						critter_unit->m_scent_grad_z = scent.grad_z;
 					}
 
-					// CPG: fixed speed=1, turn=0 (brain control comes later)
-					m_cpg_system.update( critter_unit, critter_unit->m_cpg_phase, critter_unit->m_cpg_params );
+					// modulation network: scent gradient rotated into body-local frame -> CPG params
+					if ( m_cpg_system.enabled() )
+					{
+						float in_left_right = 0.0f;
+						float in_fwd_back   = 0.0f;
+						if ( critter_unit->m_transform_shortcut )
+						{
+							const float gx = critter_unit->m_scent_grad_x;
+							const float gz = critter_unit->m_scent_grad_z;
+							const float gmag = std::sqrt(gx * gx + gz * gz);
+							if ( gmag > 1e-6f )
+							{
+								const float yaw = critter_unit->m_transform_shortcut->get_float("rotation_euler_y");
+								const float c = std::cos(yaw);
+								const float s = std::sin(yaw);
+								// world -> body: R(-yaw) around Y
+								const float local_x = ( c * gx - s * gz) / gmag; // body right (+) / left (-)
+								const float local_z = ( s * gx + c * gz) / gmag; // body forward axis
+								in_left_right = local_x;
+								in_fwd_back   = local_z;
+							}
+						}
+						mod_net_forward( critter_unit->m_genome.mod_net, in_left_right, in_fwd_back, critter_unit->m_scent_field, critter_unit->m_genome.cpg_params );
+					}
+
+					// CPG drives the constraints from the just-computed params
+					m_cpg_system.update( critter_unit, critter_unit->m_genome.cpg_phase, critter_unit->m_genome.cpg_params );
+
+					// Hebbian: accumulate per-tick product (δ · I · O) into weight_accum.
+					// Apply every ~20 CPG cycles, or when plugin.cpp flags an eat event
+					// (it already deposited the eat reward into accum with the pre-eat
+					// I/O snapshot). On eat, skip this tick's delta — it's the post-eat
+					// cliff and would otherwise dominate one accumulator entry.
+					if ( m_cpg_system.enabled() )
+					{
+						auto& net = critter_unit->m_genome.mod_net;
+						if ( net.pending_eat_apply )
+						{
+							mod_net_hebbian_apply( net );
+							net.pending_eat_apply = false;
+							net.ticks_since_apply = 0;
+							net.prev_field = critter_unit->m_scent_field;
+							net.prev_field_valid = true;
+						}
+						else
+						{
+							if ( net.prev_field_valid )
+								mod_net_hebbian_accumulate( net, critter_unit->m_scent_field - net.prev_field );
+							net.prev_field = critter_unit->m_scent_field;
+							net.prev_field_valid = true;
+							net.ticks_since_apply++;
+
+							constexpr float TWO_PI = 6.28318530717958647692f;
+							const float freq = critter_unit->m_genome.cpg_params.frequency > 0.001f
+							                       ? critter_unit->m_genome.cpg_params.frequency
+							                       : 0.001f;
+							const unsigned int interval = (unsigned int)(20.0f * TWO_PI / freq);
+							if ( net.ticks_since_apply >= interval )
+							{
+								mod_net_hebbian_apply( net );
+								net.ticks_since_apply = 0;
+							}
+						}
+					}
 				}
 			}
 			m_stats_energy_total->set( total_energy_in_entities );
@@ -373,106 +435,106 @@ namespace
 		}
 	}
 
+	// Shared spawn path for fresh critters (inherited == nullptr, uses CPG
+	// defaults) and hatchlings (inherited points to the egg's genome).
+	// Handles genome, body construction, body-plan override (CPG mode) and
+	// brain/motor wiring. Caller is responsible for anything positional
+	// (relocation, adam_distance bookkeeping) after the spawn.
+	CdCritter* CdCritterSystem::spawnCritter(float initial_energy, const CritterGenome* inherited)
+	{
+		auto critter_unit = new CdCritter();
+		m_unit_container->addChild( "critter_unit", critter_unit );
+		critter_unit->setEnergy( initial_energy );
+
+		if ( m_cpg_system.enabled() )
+		{
+			if ( inherited )
+			{
+				critter_unit->m_genome = *inherited;
+			}
+			else
+			{
+				critter_unit->m_genome.cpg_params = m_cpg_system.defaultParams();
+				critter_unit->m_genome.body_params = m_cpg_system.defaultBodyParams();
+				mod_net_init_from_defaults( critter_unit->m_genome.mod_net, m_cpg_system.defaultParams() );
+			}
+			// hatchling always starts its oscillator fresh
+			critter_unit->m_genome.cpg_phase = 0.0f;
+		}
+		resetLearningState( critter_unit );
+		m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
+
+		// BODY — apply override iff we're in CPG mode with evolved params
+		BodyPlanConfig child_body_cfg;
+		if ( m_cpg_system.enabled() && inherited )
+		{
+			m_cpg_system.expandBodyParams( critter_unit->m_genome.body_params, child_body_cfg );
+			cd_body_plan_set_override( &child_body_cfg );
+		}
+		auto newBody = m_body_system_unit_container->addChild( "body", new BEntity() );
+		newBody->addChild( "body", "CdBodyPlan" );
+		if ( m_cpg_system.enabled() && inherited )
+			cd_body_plan_set_override( nullptr );
+
+		critter_unit->addChild( "external_body", new BEntity_external() )->set( newBody );
+		refreshBodyShortcuts( critter_unit );
+
+		// BRAIN (skipped when CPG drives locomotion) or CPG motor neurons
+		if ( !m_cpg_system.enabled() )
+		{
+			critter_unit->m_brain = m_brain_system->getChild( "unit_container", 1)->addChild( "brain", "Brain" );
+
+			auto outputs = critter_unit->m_brain->getChild( "outputs", 1 );
+			auto constraints = critter_unit->m_constraints_shortcut;
+			auto constraints_ref = outputs->addChild( "bullet_constraints", new BEntity_reference() );
+			constraints_ref->set( constraints );
+
+			auto motor_neurons = critter_unit->addChild( "motor_neurons", new BEntity() );
+			motor_neurons->addChild( "eat", new BEntity_float() );
+			motor_neurons->addChild( "procreate", new BEntity_float() );
+			auto motor_neurons_ref = outputs->addChild( "motor_neurons_ref", new BEntity_reference() );
+			motor_neurons_ref->set( motor_neurons );
+
+			auto inputs = critter_unit->m_brain->getChild( "inputs", 1 );
+			for_all_children_of3( constraints )
+			{
+				auto constraint_angle_input = inputs->addChild( "constraint_angle", new BEntity_float() );
+				auto angle = (*child3)->get_reference()->getChild("angle", 1);
+				if ( angle && constraint_angle_input )
+					angle->connectServerServer( constraint_angle_input );
+			}
+
+			const unsigned int retinasize = find_vision_retina_size_or_die(this);
+			do_times( retinasize*retinasize )
+			{
+				inputs->addChild( "vision_value_R", new BEntity_float() );
+				inputs->addChild( "vision_value_G", new BEntity_float() );
+				inputs->addChild( "vision_value_B", new BEntity_float() );
+				inputs->addChild( "vision_value_A", new BEntity_float() );
+			}
+
+			critter_unit->m_brain = m_brain_system->getChildCustom( critter_unit->m_brain, "new" );
+			critter_unit->addChild( "external_brain", new BEntity_external() )->set( critter_unit->m_brain );
+			critter_unit->m_brain_inputs = critter_unit->m_brain->getChild( "inputs", 1 );
+		}
+		else
+		{
+			auto motor_neurons = critter_unit->addChild( "motor_neurons", new BEntity() );
+			motor_neurons->addChild( "eat", new BEntity_float() );
+			motor_neurons->addChild( "procreate", new BEntity_float() );
+		}
+
+		return critter_unit;
+	}
+
 	// bool CdCritterSystem::set( const char* value )
 	bool CdCritterSystem::set( const Bstring& id, BEntity* value )
 	{
 			if ( id == std::string("insert_critter") )
 			{
-						auto critter_unit = new CdCritter();
-						m_unit_container->addChild( "critter_unit", critter_unit );
-						critter_unit->setEnergy( m_intitial_energy->get_float() );
-						if ( m_cpg_system.enabled() )
-						{
-							critter_unit->m_cpg_params = m_cpg_system.defaultParams();
-							critter_unit->m_body_params = m_cpg_system.defaultBodyParams();
-						}
-						resetLearningState( critter_unit );
-						m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
-
-					// BODY
-						// auto newBody = body_unit_system->addChild( "body", new BBody() );
-						auto newBody = m_body_system_unit_container->addChild( "body", new BEntity() );
-						newBody->addChild( "body", "CdBodyPlan" );
-						
-						// auto fixed_1 = body_unit_system->addChild( "body_fixed1", "BodyFixed1" );
-						
-						// auto fixed_1 = newBody->addChild( "body_fixed1", new BEntity() );
-
-						// CdBodyPlanBuilder m;
-						// m.make( fixed_1 );
-						
-							
-						// REFERENCE TO EXTERNAL CHILD
-							critter_unit->addChild( "external_body", new BEntity_external() )->set( newBody );
-							refreshBodyShortcuts( critter_unit );
-
-					// BRAIN (skipped when CPG drives locomotion)
-					if ( !m_cpg_system.enabled() )
-					{
-						critter_unit->m_brain = m_brain_system->getChild( "unit_container", 1)->addChild( "brain", "Brain" );
-
-						// OUTPUTS
-						auto outputs = critter_unit->m_brain->getChild( "outputs", 1 );
-						auto constraints = critter_unit->m_constraints_shortcut;
-						auto constraints_ref = outputs->addChild( "bullet_constraints", new BEntity_reference() );
-						constraints_ref->set( constraints );
-
-						// motor neurons
-						auto motor_neurons = critter_unit->addChild( "motor_neurons", new BEntity() );
-						motor_neurons->addChild( "eat", new BEntity_float() );
-						motor_neurons->addChild( "procreate", new BEntity_float() );
-						auto motor_neurons_ref = outputs->addChild( "motor_neurons_ref", new BEntity_reference() );
-						motor_neurons_ref->set( motor_neurons );
-
-						// INPUTS
-						auto inputs = critter_unit->m_brain->getChild( "inputs", 1 );
-
-						// constraint angles as sensory input
-						for_all_children_of3( constraints )
-						{
-							auto constraint_angle_input = inputs->addChild( "constraint_angle", new BEntity_float() );
-							auto angle = (*child3)->get_reference()->getChild("angle", 1);
-							if ( angle )
-							{
-								if ( constraint_angle_input )
-								{
-									angle->connectServerServer( constraint_angle_input );
-								}
-								else
-								{
-									std::cout << "error: constraint_angle not found" << std::endl;
-								}
-							}
-							else
-							{
-								std::cout << "error: angle not found" << std::endl;
-							}
-						}
-
-						// VISION
-						const unsigned int retinasize = find_vision_retina_size_or_die(this);
-						do_times( retinasize*retinasize )
-						{
-							inputs->addChild( "vision_value_R", new BEntity_float() );
-							inputs->addChild( "vision_value_G", new BEntity_float() );
-							inputs->addChild( "vision_value_B", new BEntity_float() );
-							inputs->addChild( "vision_value_A", new BEntity_float() );
-						}
-
-						critter_unit->m_brain = m_brain_system->getChildCustom( critter_unit->m_brain, "new" );
-						critter_unit->addChild( "external_brain", new BEntity_external() )->set( critter_unit->m_brain );
-						critter_unit->m_brain_inputs = critter_unit->m_brain->getChild( "inputs", 1 );
-					}
-					else
-					{
-						// CPG mode: motor neurons without brain
-						auto motor_neurons = critter_unit->addChild( "motor_neurons", new BEntity() );
-						motor_neurons->addChild( "eat", new BEntity_float() );
-						motor_neurons->addChild( "procreate", new BEntity_float() );
-					}
-
-			return true;
-		}
+				spawnCritter( m_intitial_energy->get_float(), nullptr );
+				return true;
+			}
 
 			if ( id == std::string("procreate_critter") )
 			{
@@ -501,11 +563,17 @@ namespace
 
 			if ( m_cpg_system.enabled() )
 			{
-				// inherit and mutate CPG + body params
-				egg->m_cpg_params = critter_unit->m_cpg_params;
-				m_cpg_system.mutate( egg->m_cpg_params, m_rng );
-				egg->m_body_params = critter_unit->m_body_params;
-				m_cpg_system.mutateBody( egg->m_body_params, m_rng );
+				// inherit entire genome, then reset transient learning state and mutate
+				egg->m_genome = critter_unit->m_genome;
+				egg->m_genome.mod_net.prev_field = 0.0f;
+				egg->m_genome.mod_net.prev_field_valid = false;
+				egg->m_genome.mod_net.ticks_since_apply = 0;
+				egg->m_genome.mod_net.pending_eat_apply = false;
+				for ( int j = 0; j < ModulationNetwork::N_OUTPUTS; ++j )
+					for ( int i = 0; i < ModulationNetwork::N_INPUTS; ++i )
+						egg->m_genome.mod_net.weight_accum[j][i] = 0.0f;
+				mod_net_mutate( egg->m_genome.mod_net, m_rng );
+				m_cpg_system.mutateBody( egg->m_genome.body_params, m_rng );
 			}
 
 			m_egg_container->addChild( "egg", egg );
@@ -522,73 +590,7 @@ namespace
 			}
 
 			// create critter from egg genetics
-			auto critter_unit = new CdCritter();
-			m_unit_container->addChild( "critter_unit", critter_unit );
-			critter_unit->setEnergy( egg->m_energy );
-			if ( m_cpg_system.enabled() )
-			{
-				critter_unit->m_cpg_params = egg->m_cpg_params;
-				critter_unit->m_body_params = egg->m_body_params;
-			}
-			resetLearningState( critter_unit );
-			m_stats_births_total->set( m_stats_births_total->get_uint() + 1 );
-
-			// body — apply body override for evolved body params
-			BodyPlanConfig child_body_cfg;
-			if ( m_cpg_system.enabled() )
-			{
-				m_cpg_system.expandBodyParams( critter_unit->m_body_params, child_body_cfg );
-				cd_body_plan_set_override( &child_body_cfg );
-			}
-			auto newBody = m_body_system_unit_container->addChild( "body", new BEntity() );
-			newBody->addChild( "body", "CdBodyPlan" );
-			if ( m_cpg_system.enabled() )
-				cd_body_plan_set_override( nullptr );
-
-			critter_unit->addChild( "external_body", new BEntity_external() )->set( newBody );
-			refreshBodyShortcuts( critter_unit );
-
-			// brain or motor neurons
-			if ( !m_cpg_system.enabled() )
-			{
-				critter_unit->m_brain = m_brain_system->getChild( "unit_container", 1)->addChild( "brain", "Brain" );
-				auto outputs = critter_unit->m_brain->getChild( "outputs", 1 );
-				auto constraints = critter_unit->m_constraints_shortcut;
-				auto constraints_ref = outputs->addChild( "bullet_constraints", new BEntity_reference() );
-				constraints_ref->set( constraints );
-
-				auto motor_neurons = critter_unit->addChild( "motor_neurons", new BEntity() );
-				motor_neurons->addChild( "eat", new BEntity_float() );
-				motor_neurons->addChild( "procreate", new BEntity_float() );
-				auto motor_neurons_ref = outputs->addChild( "motor_neurons_ref", new BEntity_reference() );
-				motor_neurons_ref->set( motor_neurons );
-
-				auto inputs = critter_unit->m_brain->getChild( "inputs", 1 );
-				for_all_children_of3( constraints )
-				{
-					auto constraint_angle_input = inputs->addChild( "constraint_angle", new BEntity_float() );
-					auto angle = (*child3)->get_reference()->getChild("angle", 1);
-					if ( angle && constraint_angle_input )
-						angle->connectServerServer( constraint_angle_input );
-				}
-				const unsigned int retinasize = find_vision_retina_size_or_die(this);
-				do_times( retinasize*retinasize )
-				{
-					inputs->addChild( "vision_value_R", new BEntity_float() );
-					inputs->addChild( "vision_value_G", new BEntity_float() );
-					inputs->addChild( "vision_value_B", new BEntity_float() );
-					inputs->addChild( "vision_value_A", new BEntity_float() );
-				}
-				critter_unit->m_brain = m_brain_system->getChildCustom( critter_unit->m_brain, "new" );
-				critter_unit->addChild( "external_brain", new BEntity_external() )->set( critter_unit->m_brain );
-				critter_unit->m_brain_inputs = critter_unit->m_brain->getChild( "inputs", 1 );
-			}
-			else
-			{
-				auto motor_neurons = critter_unit->addChild( "motor_neurons", new BEntity() );
-				motor_neurons->addChild( "eat", new BEntity_float() );
-				motor_neurons->addChild( "procreate", new BEntity_float() );
-			}
+			auto critter_unit = spawnCritter( egg->m_energy, &egg->m_genome );
 
 			// relocate critter from default spawn to egg's current physics position
 			if ( critter_unit->m_transform_shortcut && critter_unit->m_bodyparts_shortcut )

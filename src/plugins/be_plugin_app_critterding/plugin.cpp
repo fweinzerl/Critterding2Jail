@@ -3,7 +3,7 @@
 #include "food_system.h"
 #include "body_system.h"
 #include "species_system.h"
-// #include "critter_system.h"
+#include "critter_system.h"
 #include "vision_system.h"
 #include "control_panel.h"
 #include "life_stats_panel.h"
@@ -430,15 +430,29 @@
 							auto critter_energy = critter->getChild("energy", 1);
 							auto food_energy = food->getChild("energy", 1);
 
+							float actual_transfer;
 							if ( food_energy->get_float() < transfer )
 							{
-								critter_energy->set( critter_energy->get_float() + food_energy->get_float() );
+								actual_transfer = food_energy->get_float();
+								critter_energy->set( critter_energy->get_float() + actual_transfer );
 								food_energy->set( 0.0f );
 							}
 							else
 							{
+								actual_transfer = transfer;
 								critter_energy->set( critter_energy->get_float() + transfer );
 								food_energy->set( food_energy->get_float() - transfer );
+							}
+
+							// Hebbian eat reward: food ~worth as much as the approach path.
+							// transfer=100 default * 0.02 -> ~2, matching typical scent-field magnitude.
+							// Accumulate *here* while last_inputs/outputs still reflect the
+							// pre-eat forward pass — next critter_system tick will overwrite
+							// them with the post-eat state. Then flag for apply.
+							if ( auto cd = dynamic_cast<CdCritter*>( critter ) )
+							{
+								mod_net_hebbian_accumulate( cd->m_genome.mod_net, actual_transfer * 0.02f );
+								cd->m_genome.mod_net.pending_eat_apply = true;
 							}
 						}
 					}

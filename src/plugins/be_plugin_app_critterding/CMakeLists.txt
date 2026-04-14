@@ -22,6 +22,8 @@
 		cpg_system.h
 		scent_field.cpp
 		scent_field.h
+		modulation_network.cpp
+		modulation_network.h
 		body_plan_config.h
 		control_panel.cpp
 		control_panel.h
