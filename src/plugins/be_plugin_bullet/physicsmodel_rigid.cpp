@@ -112,6 +112,12 @@ void BeEventDrivenMotionState::setWorldTransform(const btTransform& centerOfMass
 		addChild("rotation_euler_x", new BEntity_float_property());
 		addChild("rotation_euler_y", new BEntity_float_property());
 		addChild("rotation_euler_z", new BEntity_float_property());
+
+		// body-local +Z axis expressed in world coordinates; reliable
+		// "forward" direction that avoids Euler-Y drift under pitch/roll
+		addChild("forward_x", new BEntity_float_property());
+		addChild("forward_y", new BEntity_float_property());
+		addChild("forward_z", new BEntity_float_property());
 	}
 
 	bool transformEmitter::set( const Bstring& id, const Bfloat& value )
@@ -310,6 +316,30 @@ void BeEventDrivenMotionState::setWorldTransform(const btTransform& centerOfMass
 				btScalar x, y, z;
 				parentChild_transform.getRotation().getEulerZYX( z, y, x );
 				return z;
+			}
+		}
+		else if ( id == "forward_x" )
+		{
+			auto rigidbody = dynamic_cast<BPhysicsEntity*>( parent() );
+			if ( rigidbody )
+			{
+				return rigidbody->getPhysicsComponent()->getTransform().getBasis().getColumn(2).x();
+			}
+		}
+		else if ( id == "forward_y" )
+		{
+			auto rigidbody = dynamic_cast<BPhysicsEntity*>( parent() );
+			if ( rigidbody )
+			{
+				return rigidbody->getPhysicsComponent()->getTransform().getBasis().getColumn(2).y();
+			}
+		}
+		else if ( id == "forward_z" )
+		{
+			auto rigidbody = dynamic_cast<BPhysicsEntity*>( parent() );
+			if ( rigidbody )
+			{
+				return rigidbody->getPhysicsComponent()->getTransform().getBasis().getColumn(2).z();
 			}
 		}
 		return 0.0f;

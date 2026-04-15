@@ -446,7 +446,7 @@
 
 		// SERVERS
 			const float spacing( 2.0f );
-			unsigned int total_minimum_critters( 20 ); // FIXME TO GLOBAL ENTITY
+			unsigned int total_minimum_critters( 1 ); // FIXME TO GLOBAL ENTITY
 			unsigned int total_minimum_food( 800 ); // FIXME TO GLOBAL ENTITY
 			const float critter_spacing( 1.0f );
 			
@@ -523,8 +523,14 @@
 							dropzone_critter->getChild("size_z", 1)->set( dropzone_individual_height - 0.5f*critter_spacing );
 
 						// MINIMUM FOOD AND CRITTERS
+						// Distribute totals across threads, giving the remainder to the first threads
+						// so small totals like 1 don't round down to 0 everywhere.
+							const unsigned int thread_index = current_row * columns + current_column;
+							const unsigned int critters_for_this_thread =
+								total_minimum_critters / total_threads
+								+ ( thread_index < ( total_minimum_critters % total_threads ) ? 1u : 0u );
 							food_system->getChild("settings", 1)->getChild( "number_of_units", 1)->set( uint( total_minimum_food / total_threads ) );
-							critter_system->getChild("settings", 1)->getChild( "minimum_number_of_units", 1)->set( uint( total_minimum_critters / total_threads ) );
+							critter_system->getChild("settings", 1)->getChild( "minimum_number_of_units", 1)->set( uint( critters_for_this_thread ) );
 						
 						// REGISTER TO POPULATION CONTROLLER
 							population_controller->set( "register_critter_container", critter_system->getChild("unit_container", 1) );

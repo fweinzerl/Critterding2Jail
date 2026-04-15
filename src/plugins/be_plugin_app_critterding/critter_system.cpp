@@ -115,7 +115,7 @@ namespace
 		
 		m_minimum_number_of_units->set( Buint(4) );
 		m_intitial_energy->set( Bfloat(1500.0f) );
-		m_procreate_minimum_energy->set( Bfloat(5001.0f) );
+		m_procreate_minimum_energy->set( Bfloat(7000.0f) );
 		m_maximum_age->set( Buint(0) );
 		m_dropzone_position_x->set( Bfloat(-100.0f) );
 		m_dropzone_position_y->set( Bfloat(-18.0f) );
@@ -549,15 +549,34 @@ namespace
 				return false;
 			}
 			auto parent_t = critter_unit->m_transform_shortcut;
-			float parent_heading = parent_t->get_float("rotation_euler_y");
 
-			// place egg behind parent
-			// forward = (sin(heading), 0, -cos(heading)), behind = negated
-			float behind_offset = 1.5f;
+			// Behind direction from the torso's rotation basis (avoids Euler-Y
+			// drift when the body pitches/rolls during the gait). Horizontal
+			// projection only — we work in the XZ plane.
+			float fx = parent_t->get_float("forward_x");
+			float fz = parent_t->get_float("forward_z");
+			const float fh = std::sqrt(fx * fx + fz * fz);
+			if ( fh > 1e-6f )
+			{
+				fx /= fh;
+				fz /= fh;
+			}
+			else
+			{
+				fx = 0.0f;
+				fz = -1.0f;
+			}
+
+			// Offset: torso length + egg radius + small safety margin
+			const float torso_length = critter_unit->m_physics_component_shortcut->getChild("scale_z", 1)->get_float();
+			const float egg_radius = 0.3f; // half of 0.6 cube, see CdEgg::construct
+			const float safety = 0.1f;
+			const float behind_offset = torso_length + egg_radius + safety;
+
 			auto egg = new CdEgg();
-			egg->m_pos_x = parent_t->get_float("position_x") - std::sin(parent_heading) * behind_offset;
+			egg->m_pos_x = parent_t->get_float("position_x") - fx * behind_offset;
 			egg->m_pos_y = -19.8f; // above ground, will fall and settle
-			egg->m_pos_z = parent_t->get_float("position_z") + std::cos(parent_heading) * behind_offset;
+			egg->m_pos_z = parent_t->get_float("position_z") - fz * behind_offset;
 			egg->m_ticks_remaining = m_egg_incubation_ticks->get_uint();
 			egg->m_energy = critter_unit->energy(); // parent already halved its energy
 
